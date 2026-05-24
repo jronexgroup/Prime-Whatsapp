@@ -4,3 +4,7 @@ sessions/
 logs/
 firebase-credentials.json
 *.log
+*.db
+pre-key.json
+sender-key.json
+session-*.json

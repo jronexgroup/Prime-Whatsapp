@@ -12,13 +12,18 @@ export function initFirebase() {
     return null;
   }
 
-  const app = initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  });
+  try {
+    const app = initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+    });
 
-  db = getFirestore(app);
-  console.log('Firebase connected');
-  return db;
+    db = getFirestore(app);
+    console.log('Firebase connected');
+    return db;
+  } catch (err) {
+    console.warn('Firebase init failed — memory features disabled:', err.message);
+    return null;
+  }
 }
 
 export function getDb() {
