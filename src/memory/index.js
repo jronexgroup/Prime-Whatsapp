@@ -2,9 +2,9 @@ import { getUserProfile, getUserMemory, getRecentMessages } from '../firebase/in
 import { config } from '../config/index.js';
 
 export async function buildPrompt(jid, userName, incomingMessage) {
-  const profile = await getUserProfile(jid);
-  const memory = await getUserMemory(jid);
-  const recentMessages = await getRecentMessages(jid, config.memory.maxMessages);
+  const profile = (await getUserProfile(jid)) || {};
+  const memory = (await getUserMemory(jid)) || {};
+  const recentMessages = (await getRecentMessages(jid, config.memory.maxMessages)) || [];
 
   const name = profile.name || userName || 'User';
   const language = profile.language || 'English';

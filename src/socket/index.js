@@ -9,6 +9,7 @@ import { setState, setQR } from '../server.js';
 let currentSock = null;
 let onReconnect = null;
 let reconnectAttempt = 0;
+let reconnecting = false;
 
 export function getSocket() {
   return currentSock;
@@ -19,6 +20,18 @@ export function setReconnectHandler(handler) {
 }
 
 export async function createSocket() {
+  if (reconnecting) {
+    console.log('Already reconnecting, skipping...');
+    return currentSock;
+  }
+
+  if (currentSock) {
+    try {
+      currentSock.removeAllListeners();
+      currentSock.end();
+    } catch {}
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(config.session.dir);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log('Baileys version:', version.join('.'), '(latest:', isLatest, ')');
@@ -26,15 +39,16 @@ export async function createSocket() {
   const sock = makeWASocket({
     version,
     auth: state,
-    logger: pino({ level: 'silent' }),
+    logger: pino({ level: 'fatal' }),
     browser: ['Prime WhatsApp', 'Chrome', '120.0'],
     syncFullHistory: false,
-    markOnlineOnConnect: false,
+    markOnlineOnConnect: true,
     generateHighQualityLinkPreview: false,
+    keepAliveIntervalMs: 25000,
   });
 
   currentSock = sock;
-  reconnectAttempt = 0;
+  reconnecting = false;
 
   sock.ev.on('creds.update', saveCreds);
 
@@ -59,21 +73,33 @@ export async function createSocket() {
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const errorMsg = lastDisconnect?.error?.message || 'Unknown';
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
       console.log('Connection closed:', statusCode, errorMsg);
 
-      if (shouldReconnect) {
+      if (!isLoggedOut) {
         reconnectAttempt++;
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
-        console.log(`Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempt})...`);
+        const maxAttempts = 20;
+        if (reconnectAttempt > maxAttempts) {
+          console.log(`Max reconnect attempts (${maxAttempts}) reached. Stopping. Restart the bot manually.`);
+          return;
+        }
+        console.log(`Reconnecting in ${delay / 1000}s (attempt ${reconnectAttempt}/${maxAttempts})...`);
+        reconnecting = true;
         setTimeout(async () => {
-          await createSocket();
-          if (onReconnect) onReconnect(currentSock);
+          try {
+            await createSocket();
+            if (onReconnect) onReconnect(currentSock);
+          } catch (err) {
+            console.error('Reconnect failed:', err.message);
+            reconnecting = false;
+          }
         }, delay);
       }
     }
 
     if (connection === 'open') {
+      reconnectAttempt = 0;
       console.log('✅ WhatsApp connected!');
     }
   });

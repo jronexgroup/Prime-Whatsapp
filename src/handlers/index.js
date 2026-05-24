@@ -32,12 +32,14 @@ async function handleMessage(sock, msg) {
   const sender = msg.key.participant || jid;
   const pushName = msg.pushName || 'User';
 
-  const isGroup = jid.endsWith('@g.us');
-  const isMentioned = isGroup
-    ? text.includes(`@${sock.user.id.split(':')[0]}`)
-    : true;
+  console.log(`📩 Message from ${pushName} (${sender}): ${text.substring(0, 60)}`);
 
-  if (isGroup && !isMentioned) return;
+  const isGroup = jid.endsWith('@g.us');
+  if (isGroup) {
+    if (!sock.user) return;
+    const isMentioned = text.includes(`@${sock.user.id.split(':')[0]}`);
+    if (!isMentioned) return;
+  }
 
   const db = getDb();
   const cleanText = isGroup
@@ -57,7 +59,9 @@ async function handleMessage(sock, msg) {
   await messageQueue.add(async () => {
     try {
       const prompt = await buildPrompt(sender, pushName, cleanText);
+      console.log('🤖 Generating AI reply...');
       const reply = await generateReply(prompt);
+      console.log(`✅ AI reply: ${reply.substring(0, 60)}`);
       await sendTypingReply(sock, jid, reply, msg.key);
       await saveMessage(sender, 'assistant', reply).catch(() => {});
 
