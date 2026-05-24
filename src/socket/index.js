@@ -1,6 +1,9 @@
 import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
 import { config } from '../config/index.js';
 
 let currentSock = null;
@@ -37,9 +40,13 @@ export async function createSocket() {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      console.log('\nScan this QR code with your WhatsApp:\n');
+      console.log('\n📱 Scan this QR code with your WhatsApp:\n');
       qrcode.generate(qr, { small: true });
-      console.log('\n📱 Open WhatsApp → Linked Devices → Link a Device\n');
+      console.log('\n📍 Open WhatsApp → Linked Devices → Link a Device\n');
+
+      QRCode.toFile(resolve('qr.png'), qr, { type: 'png', width: 400 }, (err) => {
+        if (!err) console.log('💾 QR also saved as qr.png — open it on any device');
+      });
     }
 
     if (connection === 'close') {

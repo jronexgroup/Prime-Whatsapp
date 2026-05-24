@@ -8,3 +8,6 @@ firebase-credentials.json
 pre-key.json
 sender-key.json
 session-*.json
+scripts/*.json
+qr.png
+bot.pid

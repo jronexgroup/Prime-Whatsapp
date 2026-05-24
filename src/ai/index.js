@@ -11,7 +11,7 @@ export function initAI() {
   }
 
   genAI = new GoogleGenerativeAI(config.geminiApiKey);
-  model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   console.log('Gemini AI initialized');
   return model;
 }
@@ -21,9 +21,14 @@ export function getModel() {
 }
 
 export async function generateReply(prompt) {
-  if (!model) return 'AI is not configured. Please set GEMINI_API_KEY.';
+  if (!model) return '⚙️ AI is not configured.';
 
-  const result = await model.generateContent(prompt);
-  const reply = result.response.text();
-  return reply;
+  try {
+    const result = await model.generateContent(prompt);
+    const reply = result.response.text();
+    return reply;
+  } catch (err) {
+    console.error('AI error:', err.message);
+    return '⚠️ AI temporarily unavailable. Try again later.';
+  }
 }
