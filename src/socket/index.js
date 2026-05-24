@@ -45,8 +45,12 @@ export async function createSocket() {
       console.log('\n📍 Open WhatsApp → Linked Devices → Link a Device\n');
 
       QRCode.toFile(resolve('qr.png'), qr, { type: 'png', width: 400 }, (err) => {
-        if (!err) console.log('💾 QR also saved as qr.png — open it on any device');
+        if (!err) console.log('💾 QR saved as qr.png');
       });
+
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`;
+      console.log('\n🌐 Or open this link in your browser to scan:');
+      console.log(qrUrl + '\n');
     }
 
     if (connection === 'close') {
