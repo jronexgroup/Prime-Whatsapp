@@ -2,10 +2,12 @@ import { createSocket, setReconnectHandler, getSocket } from './socket/index.js'
 import { setupHandlers } from './handlers/index.js';
 import { initFirebase } from './firebase/index.js';
 import { initAI } from './ai/index.js';
+import { startServer, setState } from './server.js';
 
 console.log('Starting Prime WhatsApp...');
 console.log('Stop anytime with: Ctrl+C (or npm run stop)');
 
+startServer();
 initFirebase();
 initAI();
 

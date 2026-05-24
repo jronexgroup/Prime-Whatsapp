@@ -2,9 +2,9 @@ import { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaile
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import QRCode from 'qrcode';
-import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { config } from '../config/index.js';
+import { setState, setQR } from '../server.js';
 
 let currentSock = null;
 let onReconnect = null;
@@ -39,7 +39,10 @@ export async function createSocket() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+    setState(qr ? 'awaiting_scan' : connection);
+
     if (qr) {
+      setQR(qr);
       console.log('\n📱 Scan this QR code with your WhatsApp:\n');
       qrcode.generate(qr, { small: true });
       console.log('\n📍 Open WhatsApp → Linked Devices → Link a Device\n');
@@ -49,8 +52,8 @@ export async function createSocket() {
       });
 
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qr)}`;
-      console.log('\n🌐 Or open this link in your browser to scan:');
-      console.log(qrUrl + '\n');
+      console.log('\n🌐 Or open /qr page in your browser:');
+      console.log(`http://localhost:${process.env.PORT || 3000}/qr\n`);
     }
 
     if (connection === 'close') {

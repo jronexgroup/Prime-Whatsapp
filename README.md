@@ -126,10 +126,15 @@ prime-whatsapp/
    - **Runtime:** `Node`
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
-5. Add environment variables (from `.env`)
-6. Deploy → Check logs for QR code → Scan it
+5. Add environment variable in Render dashboard:
+   - `GEMINI_API_KEY` = your key
+   - `OWNER_NUMBER` = your number
+6. **Health Check Path:** `/`
+7. Click **Deploy**
+8. Once deployed → Open `https://your-app.onrender.com/qr` in your browser → Scan QR with WhatsApp
 
-> ⚠️ Render free tier sleeps after inactivity. Use UptimeRobot to ping every 10 min.
+> ✅ Bot includes a built-in HTTP server on `$PORT`. No port warnings.
+> Stop anytime from Render Dashboard.
 </details>
 
 <details>
