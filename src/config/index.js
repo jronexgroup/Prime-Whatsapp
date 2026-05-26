@@ -10,6 +10,11 @@ function loadFirebaseKey() {
 
 export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY,
+  cf: {
+    accountId: process.env.CF_ACCOUNT_ID,
+    apiToken: process.env.CF_API_TOKEN,
+    model: process.env.CF_MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,

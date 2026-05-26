@@ -64,7 +64,9 @@ async function api(path, opts = {}) {
   });
   if (!res.ok) {
     const body = await res.text();
-    console.warn(`Firestore API error ${res.status}:`, body.substring(0, 200));
+    if (res.status !== 404) {
+      console.warn(`Firestore API error ${res.status}:`, body.substring(0, 200));
+    }
     return null;
   }
   return res.json();

@@ -6,12 +6,31 @@ import { messageQueue } from '../utils/queue.js';
 import { config } from '../config/index.js';
 
 const VALID_JID_SUFFIXES = ['@s.whatsapp.net', '@g.us'];
-const SKIP_SUFFIXES = ['@lid', '@broadcast', '@newsletter'];
+const SKIP_SUFFIXES = ['@broadcast', '@newsletter'];
 
 export function setupHandlers(sock) {
-  sock.ev.on('messages.upsert', async ({ messages }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
+      const jid = msg.key?.remoteJid || '?';
+      const fromMe = msg.key?.fromMe;
+      const hasText = !!(msg.message?.conversation || msg.message?.extendedTextMessage?.text);
+      console.log(`[EVENT] upsert type=${type} fromMe=${fromMe} jid=${jid} hasText=${hasText}`);
       await handleMessage(sock, msg);
+    }
+  });
+
+  sock.ev.on('messages.update', (updates) => {
+    for (const u of updates) {
+      if (u.key?.remoteJid) {
+        console.log(`[EVENT] update ${u.key.remoteJid}`);
+      }
+    }
+  });
+
+  sock.ev.on('presence.update', ({ id, presences }) => {
+    if (id?.endsWith('@s.whatsapp.net') || id?.endsWith('@g.us')) {
+      const states = Object.entries(presences).map(([jid, p]) => `${jid.split('@')[0]}:${p.lastKnownPresence}`).join(', ');
+      console.log(`[EVENT] presence ${id}: ${states}`);
     }
   });
 }
@@ -50,9 +69,13 @@ async function handleMessage(sock, msg) {
 
   const cmd = matchCommand(cleanText);
   if (cmd) {
-    const reply = await cmd.handler(sender);
-    await sendTypingReply(sock, jid, reply, msg.key);
-    await saveMessage(sender, 'assistant', reply).catch(() => {});
+    try {
+      const reply = await cmd.handler(sender);
+      await sendTypingReply(sock, jid, reply, msg);
+      await saveMessage(sender, 'assistant', reply).catch(() => {});
+    } catch (err) {
+      console.error('[!] Command error:', err?.message || err);
+    }
     return;
   }
 
@@ -62,7 +85,7 @@ async function handleMessage(sock, msg) {
       console.log('🤖 Generating AI reply...');
       const reply = await generateReply(prompt);
       console.log(`✅ AI reply: ${reply.substring(0, 60)}`);
-      await sendTypingReply(sock, jid, reply, msg.key);
+      await sendTypingReply(sock, jid, reply, msg);
       await saveMessage(sender, 'assistant', reply).catch(() => {});
 
       if (db) {
@@ -85,16 +108,20 @@ async function handleMessage(sock, msg) {
         }
       }
     } catch (err) {
-      console.error('Handler error:', err.message);
+      console.error('Handler error:', err?.message || err);
     }
   });
 }
 
 async function sendTypingReply(sock, jid, text, quotedKey) {
-  await sock.sendPresenceUpdate('composing', jid);
-  await sleep(getTypingDelay(text));
-  await sock.sendMessage(jid, { text }, { quoted: quotedKey });
-  await sock.sendPresenceUpdate('paused', jid);
+  try {
+    await sock.sendPresenceUpdate('composing', jid);
+    await sleep(getTypingDelay(text));
+    await sock.sendMessage(jid, { text }, { quoted: quotedKey });
+    await sock.sendPresenceUpdate('paused', jid);
+  } catch (err) {
+    console.error('[!] Send error:', err?.message || err);
+  }
 }
 
 function sleep(ms) {
@@ -102,6 +129,7 @@ function sleep(ms) {
 }
 
 function getTypingDelay(text) {
+  if (!text) return 500;
   const base = text.length * 30;
   return Math.min(Math.max(base, 500), 3000);
 }
