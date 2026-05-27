@@ -13,7 +13,7 @@ export const config = {
   cf: {
     accountId: process.env.CF_ACCOUNT_ID,
     apiToken: process.env.CF_API_TOKEN,
-    model: process.env.CF_MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    model: process.env.CF_MODEL || '@cf/qwen/qwen3-30b-a3b-fp8',
   },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,

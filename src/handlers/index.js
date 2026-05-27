@@ -8,12 +8,29 @@ import { config } from '../config/index.js';
 const VALID_JID_SUFFIXES = ['@s.whatsapp.net', '@g.us'];
 const SKIP_SUFFIXES = ['@broadcast', '@newsletter'];
 
+const processedIds = new Set();
+const MAX_PROCESSED_IDS = 100;
+
 export function setupHandlers(sock) {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
       const jid = msg.key?.remoteJid || '?';
       const fromMe = msg.key?.fromMe;
+      const msgId = msg.key?.id;
       const hasText = !!(msg.message?.conversation || msg.message?.extendedTextMessage?.text);
+
+      if (msgId) {
+        if (processedIds.has(msgId)) {
+          console.log(`[SKIP] duplicate msgId=${msgId.substring(0,16)}`);
+          continue;
+        }
+        processedIds.add(msgId);
+        if (processedIds.size > MAX_PROCESSED_IDS) {
+          const first = processedIds.values().next().value;
+          processedIds.delete(first);
+        }
+      }
+
       console.log(`[EVENT] upsert type=${type} fromMe=${fromMe} jid=${jid} hasText=${hasText}`);
       await handleMessage(sock, msg);
     }
@@ -79,7 +96,7 @@ async function handleMessage(sock, msg) {
     return;
   }
 
-  await messageQueue.add(async () => {
+      await messageQueue.add(async () => {
     try {
       const prompt = await buildPrompt(sender, pushName, cleanText);
       console.log('🤖 Generating AI reply...');
@@ -90,22 +107,11 @@ async function handleMessage(sock, msg) {
 
       if (db) {
         const memory = await getUserMemory(sender);
-        const existingSummary = memory.summary || '';
-        if (existingSummary) {
-          const newSummary = await generateReply(
-            `Summarize this conversation in one short sentence for long-term memory:\nUser: ${cleanText}\nAssistant: ${reply}\n\nKeep it under 20 words.`
-          );
-          const merged = existingSummary + ' | ' + newSummary;
-          const finalSummary = merged.length > 500
-            ? merged.slice(-500)
-            : merged;
-          await updateMemorySummary(sender, finalSummary).catch(() => {});
-        } else {
-          const newSummary = await generateReply(
-            `Create a short memory summary about this user in under 15 words:\nUser said: ${cleanText}`
-          );
-          await updateMemorySummary(sender, newSummary).catch(() => {});
-        }
+        const existing = memory.context || '';
+        const newEntry = `User: ${cleanText} | ${config.bot.name}: ${reply}`;
+        const merged = existing ? existing + '\n' + newEntry : newEntry;
+        const finalContext = merged.length > 2500 ? merged.slice(-2500) : merged;
+        await updateMemorySummary(sender, finalContext).catch(() => {});
       }
     } catch (err) {
       console.error('Handler error:', err?.message || err);

@@ -38,7 +38,18 @@ export async function generateReply(prompt) {
         },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: 'You are Prime, a friendly WhatsApp assistant. Reply concisely and naturally in the same language as the user.' },
+            { role: 'system', content: `You are ${config.bot.name} talking to a friend. Reply in the EXACT same language as the friend.
+
+Friend writes Banglish (Bengali in roman letters):
+  "kemon acho?"  ->  "bhalo achi, tumi kemon?"
+  "ki korcho?"   ->  "kisu na, just chill korchi"
+  "kalke ghurte jabi?"  ->  "haan jabo, kothay jabo?"
+  "ei sob ki bolchis?"  ->  "ar kichu na, just fun korchi"
+
+Friend writes English -> reply English. Friend writes Hinglish -> reply Hinglish.
+
+NEVER use Bengali/Hindi Unicode (ো, ই, आ, इ). Only a-z roman letters.
+Be natural, 1-3 sentences, never repeat their question, no honorifics like didi/bhai/sir.` },
             { role: 'user', content: prompt },
           ],
         }),
@@ -52,7 +63,10 @@ export async function generateReply(prompt) {
       throw new Error(err);
     }
 
-    return data.result.response;
+    const text = data.result?.choices?.[0]?.message?.content
+      || data.result?.response
+      || '';
+    return text.trim();
   } catch (err) {
     clearTimeout(timeout);
     if (err.name === 'AbortError') {
