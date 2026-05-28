@@ -53,7 +53,8 @@ async function api(path, opts = {}) {
   const token = await getValidToken();
   if (!token) return null;
 
-  const url = `${FIRESTORE_URL}/${path}`;
+  const separator = path.startsWith(':') ? '' : '/';
+  const url = `${FIRESTORE_URL}${separator}${path}`;
   const res = await fetch(url, {
     ...opts,
     headers: {
@@ -69,6 +70,7 @@ async function api(path, opts = {}) {
     }
     return null;
   }
+  if (res.status === 204) return true;
   return res.json();
 }
 
@@ -90,12 +92,18 @@ function docToObj(doc) {
 function objToFields(obj) {
   const fields = {};
   for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined) continue;
     if (typeof val === 'string') fields[key] = { stringValue: val };
     else if (typeof val === 'number') fields[key] = { integerValue: val.toString() };
     else if (typeof val === 'boolean') fields[key] = { booleanValue: val };
-    else if (typeof val === 'object') fields[key] = { mapValue: { fields: objToFields(val) } };
+    else if (typeof val === 'object' && !Array.isArray(val)) fields[key] = { mapValue: { fields: objToFields(val) } };
+    else if (Array.isArray(val)) fields[key] = { arrayValue: { values: val.map(v => ({ stringValue: String(v) })) } };
   }
   return fields;
+}
+
+function makeDoc(name, data) {
+  return { name, fields: objToFields(data) };
 }
 
 export function initFirebase() {
@@ -114,6 +122,25 @@ export function getDb() {
   return db;
 }
 
+async function listCollection(collectionPath, opts = {}) {
+  const parts = collectionPath.split('/');
+  let parent = '';
+  let collectionId = parts[parts.length - 1];
+  if (parts.length > 1) {
+    parent = parts.slice(0, -1).join('/');
+  }
+
+  const params = new URLSearchParams();
+  params.set('collectionId', collectionId);
+  if (opts.pageSize) params.set('pageSize', opts.pageSize);
+  if (opts.orderBy) params.set('orderBy', opts.orderBy);
+  if (parent) params.set('parent', `projects/${PROJECT_ID}/databases/(default)/documents/${parent}`);
+
+  return api(`:listDocuments?${params.toString()}`, { method: 'POST' });
+}
+
+// ── Users ──
+
 export async function getUserProfile(jid) {
   if (!db) return null;
   const doc = await api(`users/${encodeURIComponent(jid)}`);
@@ -130,8 +157,9 @@ export async function getUserMemory(jid) {
 
 export async function getRecentMessages(jid, limit = 20) {
   if (!db) return [];
-  const result = await api(
-    `users/${encodeURIComponent(jid)}/messages?pageSize=${limit}&orderBy=timestamp desc`
+  const result = await listCollection(
+    `users/${encodeURIComponent(jid)}/messages`,
+    { pageSize: limit, orderBy: 'timestamp desc' }
   );
   if (!result || !result.documents) return [];
   const msgs = result.documents.map((d) => docToObj(d));
@@ -154,24 +182,130 @@ export async function saveMessage(jid, role, text) {
 
 export async function updateProfile(jid, profile) {
   if (!db) return;
-  const existing = await api(`users/${encodeURIComponent(jid)}`);
-  const fields = existing?.fields || {};
-  fields.profile = { mapValue: { fields: objToFields(profile) } };
-
   await api(`users/${encodeURIComponent(jid)}?updateMask.fieldPaths=profile`, {
     method: 'PATCH',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({
+      fields: {
+        profile: { mapValue: { fields: objToFields(profile) } }
+      },
+    }),
   });
 }
 
 export async function updateMemorySummary(jid, summary) {
   if (!db) return;
-  const existing = await api(`users/${encodeURIComponent(jid)}`);
-  const fields = existing?.fields || {};
-  fields.memory = { mapValue: { fields: objToFields({ summary }) } };
-
   await api(`users/${encodeURIComponent(jid)}?updateMask.fieldPaths=memory`, {
     method: 'PATCH',
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({
+      fields: {
+        memory: { mapValue: { fields: objToFields({ summary }) } }
+      },
+    }),
   });
+}
+
+export async function listUsers() {
+  if (!db) return [];
+  const result = await listCollection('users', { pageSize: 100 });
+  if (!result || !result.documents) return [];
+  return result.documents.map((doc) => {
+    const obj = docToObj(doc);
+    const jid = decodeURIComponent(doc.name.split('/').pop());
+    return { jid, ...obj };
+  });
+}
+
+// ── Broadcasts ──
+
+export async function listBroadcasts() {
+  if (!db) return [];
+  const result = await listCollection('broadcasts', { pageSize: 100 });
+  if (!result || !result.documents) return [];
+  return result.documents.map((doc) => {
+    const obj = docToObj(doc);
+    obj.id = doc.name.split('/').pop();
+    return obj;
+  });
+}
+
+export async function createBroadcast(data) {
+  if (!db) return null;
+  const result = await api('broadcasts', {
+    method: 'POST',
+    body: JSON.stringify(makeDoc(null, data)),
+  });
+  if (!result) return null;
+  return { id: result.name.split('/').pop(), ...data };
+}
+
+export async function updateBroadcast(id, data) {
+  if (!db) return false;
+  const ok = await api(`broadcasts/${id}?updateMask.fieldPaths=${Object.keys(data).join(',')}`, {
+    method: 'PATCH',
+    body: JSON.stringify(makeDoc(null, data)),
+  });
+  return !!ok;
+}
+
+export async function deleteBroadcast(id) {
+  if (!db) return false;
+  const ok = await api(`broadcasts/${id}`, { method: 'DELETE' });
+  return !!ok;
+}
+
+// ── Tasks ──
+
+export async function listTasks() {
+  if (!db) return [];
+  const result = await listCollection('tasks', { pageSize: 100 });
+  if (!result || !result.documents) return [];
+  return result.documents.map((doc) => {
+    const obj = docToObj(doc);
+    obj.id = doc.name.split('/').pop();
+    return obj;
+  });
+}
+
+export async function createTask(data) {
+  if (!db) return null;
+  const result = await api('tasks', {
+    method: 'POST',
+    body: JSON.stringify(makeDoc(null, data)),
+  });
+  if (!result) return null;
+  return { id: result.name.split('/').pop(), ...data };
+}
+
+export async function updateTask(id, data) {
+  if (!db) return false;
+  const ok = await api(`tasks/${id}?updateMask.fieldPaths=${Object.keys(data).join(',')}`, {
+    method: 'PATCH',
+    body: JSON.stringify(makeDoc(null, data)),
+  });
+  return !!ok;
+}
+
+export async function deleteTask(id) {
+  if (!db) return false;
+  const ok = await api(`tasks/${id}`, { method: 'DELETE' });
+  return !!ok;
+}
+
+// ── Bot Config ──
+
+export async function getBotConfig() {
+  if (!db) return null;
+  const doc = await api('config/bot');
+  if (!doc || !doc.fields) return null;
+  return docToObj(doc);
+}
+
+export async function updateBotConfig(config) {
+  if (!db) return false;
+  const fieldPaths = Object.keys(config).join(',');
+  const ok = await api(`config/bot?updateMask.fieldPaths=${fieldPaths}`, {
+    method: 'PATCH',
+    body: JSON.stringify(makeDoc(null, config)),
+  });
+  return !!ok;
 }

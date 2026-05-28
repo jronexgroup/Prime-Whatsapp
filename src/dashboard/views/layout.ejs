@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prime WhatsApp - Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .sidebar a.active { background: rgba(255,255,255,.15); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="sidebar">
+      <h2>Prime WhatsApp</h2>
+      <a href="/dashboard" class="<%= path === '/dashboard' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dashboard/qr" class="<%= path === '/dashboard/qr' ? 'active' : '' %>">QR / Pairing</a>
+      <a href="/dashboard/chat" class="<%= path === '/dashboard/chat' ? 'active' : '' %>">Send Message</a>
+      <a href="/dashboard/broadcast" class="<%= path === '/dashboard/broadcast' ? 'active' : '' %>">Broadcast</a>
+      <a href="/dashboard/schedule" class="<%= path === '/dashboard/schedule' ? 'active' : '' %>">Schedule</a>
+      <a href="/dashboard/personality" class="<%= path === '/dashboard/personality' ? 'active' : '' %>">Personality</a>
+      <a href="/dashboard/profile" class="<%= path === '/dashboard/profile' ? 'active' : '' %>">My Profile</a>
+      <a href="/dashboard/users" class="<%= path === '/dashboard/users' ? 'active' : '' %>">Users</a>
+      <a href="/dashboard/memory" class="<%= path === '/dashboard/memory' ? 'active' : '' %>">Memory</a>
+      <a href="/dashboard/tasks" class="<%= path === '/dashboard/tasks' ? 'active' : '' %>">Tasks</a>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:20px;">
+      <a href="/dashboard/logout">Logout</a>
+    </nav>
+    <div class="main">

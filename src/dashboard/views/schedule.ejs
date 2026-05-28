@@ -1,0 +1,33 @@
+<%- include('layout', { path: '/dashboard/schedule' }) %>
+<div class="card">
+  <h3>Scheduled Broadcasts</h3>
+  <% if (!broadcasts || broadcasts.length === 0) { %>
+    <div class="empty">No scheduled broadcasts. <a href="/dashboard/broadcast">Create one</a> with a time.</div>
+  <% } else { %>
+    <table>
+      <tr><th>Name</th><th>Scheduled At</th><th>Recipients</th><th>Status</th><th>Actions</th></tr>
+      <% broadcasts.forEach(b => { %>
+        <tr>
+          <td><%= b.name || 'Untitled' %></td>
+          <td><%= b.scheduledAt ? new Date(parseInt(b.scheduledAt)).toLocaleString() : '-' %></td>
+          <td><%= (b.recipients || []).length %></td>
+          <td><span class="badge <%= b.status === 'sent' ? 'connected' : 'pending' %>"><%= b.status || 'pending' %></span></td>
+          <td><button class="del-btn" data-id="<%= b.id %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Del</button></td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</div>
+
+<script>
+document.querySelectorAll('.del-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete?')) return;
+    const r = await api('DELETE', `/api/broadcasts/${btn.dataset.id}`);
+    if (r?.ok) { showToast('Deleted'); location.reload(); }
+  });
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

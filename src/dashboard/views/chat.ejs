@@ -1,0 +1,35 @@
+<%- include('layout', { path: '/dashboard/chat' }) %>
+<div class="card">
+  <h3>Send Message</h3>
+  <form id="sendForm">
+    <label>Recipient JID</label>
+    <input type="text" id="jid" list="userList" placeholder="919876543210@s.whatsapp.net" required autocomplete="off">
+    <datalist id="userList">
+      <% (users || []).forEach(u => { %>
+        <option value="<%= u.jid %>"><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
+      <% }) %>
+    </datalist>
+    <label>Message</label>
+    <textarea id="message" rows="4" placeholder="Type your message..." required></textarea>
+    <button type="submit">Send Now</button>
+  </form>
+</div>
+
+<script>
+get('#sendForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button');
+  btn.disabled = true; btn.textContent = 'Sending...';
+  const r = await fetch('/dashboard/chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jid: get('#jid').value, message: get('#message').value }),
+  });
+  btn.disabled = false; btn.textContent = 'Send Now';
+  if (r.ok) { showToast('Message sent!'); get('#message').value = ''; }
+  else { const d = await r.json().catch(() => ({})); showToast(d.error || 'Failed', 'error'); }
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

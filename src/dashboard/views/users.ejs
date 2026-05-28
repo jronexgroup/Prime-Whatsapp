@@ -1,0 +1,35 @@
+<%- include('layout', { path: '/dashboard/users' }) %>
+<div class="card">
+  <h3>Users (<%= (users || []).length %>)</h3>
+  <% if (!users || users.length === 0) { %>
+    <div class="empty">No users found. Users appear when they message the bot.</div>
+  <% } else { %>
+    <table>
+      <tr><th>Name</th><th>JID</th><th>Language</th><th>Actions</th></tr>
+      <% users.forEach(u => { %>
+        <tr>
+          <td><%= (u.profile && u.profile.name) || '—' %></td>
+          <td style="font-size:12px;word-break:break-all"><%= u.jid %></td>
+          <td><%= (u.profile && u.profile.language) || 'auto' %></td>
+          <td>
+            <a href="/dashboard/memory?jid=<%= encodeURIComponent(u.jid) %>" class="btn" style="font-size:12px;padding:4px 10px">Memory</a>
+            <button class="reset-btn" data-jid="<%= u.jid %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Reset</button>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</div>
+
+<script>
+document.querySelectorAll('.reset-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Reset memory for this user?')) return;
+    const r = await api('POST', `/api/users/${encodeURIComponent(btn.dataset.jid)}/reset`);
+    if (r?.ok) showToast('Memory reset!');
+  });
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

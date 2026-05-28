@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prime WhatsApp - Login</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-page">
+  <div class="login-box">
+    <h1>Prime WhatsApp</h1>
+    <% if (error) { %><div class="error"><%= error %></div><% } %>
+    <form method="POST" action="/dashboard/login">
+      <input type="password" name="password" placeholder="Dashboard Password" required autofocus>
+      <button type="submit" style="width:100%">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

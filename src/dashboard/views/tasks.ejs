@@ -1,0 +1,70 @@
+<%- include('layout', { path: '/dashboard/tasks' }) %>
+<div class="card">
+  <h3>New Task</h3>
+  <form id="taskForm">
+    <label>Task Name</label>
+    <input type="text" id="taskName" placeholder="Monday greeting" required>
+    <label>Type</label>
+    <select id="taskType">
+      <option value="scheduled_message">Scheduled Message</option>
+      <option value="auto_reply">Auto-reply Template</option>
+      <option value="reminder">Reminder</option>
+    </select>
+    <label>Message / Reply</label>
+    <textarea id="taskMessage" rows="3" placeholder="The message to send..."></textarea>
+    <label>Target JID</label>
+    <input type="text" id="targetJid" placeholder="919876543210@s.whatsapp.net">
+    <label>Keywords (for auto-reply, comma-separated)</label>
+    <input type="text" id="keywords" placeholder="hello, hi, help">
+    <button type="submit">Create Task</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Tasks</h3>
+  <% if (!tasks || tasks.length === 0) { %>
+    <div class="empty">No tasks created yet.</div>
+  <% } else { %>
+    <table>
+      <tr><th>Name</th><th>Type</th><th>Enabled</th><th>Created</th><th>Actions</th></tr>
+      <% tasks.forEach(t => { %>
+        <tr>
+          <td><%= t.name || 'Untitled' %></td>
+          <td><%= t.type || 'scheduled_message' %></td>
+          <td><%= t.enabled ? 'Yes' : 'No' %></td>
+          <td><%= t.createdAt ? new Date(parseInt(t.createdAt)).toLocaleDateString() : '—' %></td>
+          <td>
+            <button class="toggle-btn" data-id="<%= t.id %>" data-enabled="<%= t.enabled %>" style="font-size:12px;padding:4px 10px"><%= t.enabled ? 'Disable' : 'Enable' %></button>
+            <button class="del-task-btn" data-id="<%= t.id %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Del</button>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</div>
+
+<script>
+get('#taskForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = { name: get('#taskName').value, type: get('#taskType').value, message: get('#taskMessage').value, targetJid: get('#targetJid').value, keywords: get('#keywords').value.split(',').map(s => s.trim()).filter(Boolean), createdAt: Date.now().toString() };
+  const r = await api('POST', '/api/tasks', data);
+  if (r) { showToast('Task created!'); location.reload(); }
+});
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const enabled = btn.dataset.enabled === 'true' ? false : true;
+    const r = await api('PUT', `/api/tasks/${btn.dataset.id}`, { enabled });
+    if (r?.ok) { showToast('Updated!'); location.reload(); }
+  });
+});
+document.querySelectorAll('.del-task-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete?')) return;
+    const r = await api('DELETE', `/api/tasks/${btn.dataset.id}`);
+    if (r?.ok) { showToast('Deleted'); location.reload(); }
+  });
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

@@ -1,0 +1,18 @@
+<%- include('layout', { path: '/dashboard/qr' }) %>
+<div class="card" style="text-align:center">
+  <h3>QR Code / Pairing</h3>
+  <% if (qr) { %>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=<%= encodeURIComponent(qr) %>" style="margin:16px 0" />
+    <p class="text-muted">Open WhatsApp → Linked Devices → Link a Device</p>
+    <p class="text-muted">Status: <span class="badge <%= state === 'open' ? 'connected' : (state === 'scan_qr' ? 'scan_qr' : 'disconnected') %>"><%= state %></span></p>
+  <% } else if (state === 'open') { %>
+    <p>WhatsApp connected! Status: <strong>open</strong></p>
+  <% } else { %>
+    <p>Waiting for QR code... Status: <strong><%= state %></strong></p>
+    <p class="text-muted mt-12">If QR doesn't appear, try restarting the bot.</p>
+  <% } %>
+  <div class="mt-12"><button onclick="location.reload()">Refresh</button></div>
+</div>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

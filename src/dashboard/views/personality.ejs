@@ -1,0 +1,39 @@
+<%- include('layout', { path: '/dashboard/personality' }) %>
+<div class="card">
+  <h3>Bot Personality Editor</h3>
+  <p class="text-muted mb-12">These settings define how the bot speaks and behaves. Saved to Firebase config.</p>
+  <form method="POST" action="/dashboard/personality">
+    <label>Bot Name</label>
+    <input type="text" name="name" value="<%= (config && config.name) || 'Prime' %>">
+    <label>Language</label>
+    <select name="language">
+      <option value="auto" <%= config && config.language === 'auto' ? 'selected' : '' %>>Auto-detect</option>
+      <option value="Banglish" <%= config && config.language === 'Banglish' ? 'selected' : '' %>>Banglish</option>
+      <option value="Hinglish" <%= config && config.language === 'Hinglish' ? 'selected' : '' %>>Hinglish</option>
+      <option value="English" <%= config && config.language === 'English' ? 'selected' : '' %>>English</option>
+      <option value="Bengali" <%= config && config.language === 'Bengali' ? 'selected' : '' %>>Bengali</option>
+      <option value="Hindi" <%= config && config.language === 'Hindi' ? 'selected' : '' %>>Hindi</option>
+    </select>
+    <label>Tone</label>
+    <select name="tone">
+      <option value="friendly" <%= config && config.tone === 'friendly' ? 'selected' : '' %>>Friendly</option>
+      <option value="professional" <%= config && config.tone === 'professional' ? 'selected' : '' %>>Professional</option>
+      <option value="humorous" <%= config && config.tone === 'humorous' ? 'selected' : '' %>>Humorous</option>
+      <option value="formal" <%= config && config.tone === 'formal' ? 'selected' : '' %>>Formal</option>
+    </select>
+    <label>Relationship</label>
+    <select name="relationship">
+      <option value="friend" <%= config && config.relationship === 'friend' ? 'selected' : '' %>>Friend</option>
+      <option value="assistant" <%= config && config.relationship === 'assistant' ? 'selected' : '' %>>Assistant</option>
+      <option value="teacher" <%= config && config.relationship === 'teacher' ? 'selected' : '' %>>Teacher</option>
+      <option value="mentor" <%= config && config.relationship === 'mentor' ? 'selected' : '' %>>Mentor</option>
+    </select>
+    <label>System Prompt</label>
+    <textarea name="systemPrompt" rows="10"><%= (config && config.systemPrompt) || '' %></textarea>
+    <button type="submit">Save Personality</button>
+  </form>
+  <% if (typeof error !== 'undefined' && error) { %><p class="error mt-12"><%= error %></p><% } %>
+</div>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

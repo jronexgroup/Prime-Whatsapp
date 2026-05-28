@@ -4,6 +4,7 @@ import { buildPrompt } from '../memory/index.js';
 import { generateReply } from '../ai/index.js';
 import { messageQueue } from '../utils/queue.js';
 import { config } from '../config/index.js';
+import { incrementMessages, addActiveUser } from '../server.js';
 
 const VALID_JID_SUFFIXES = ['@s.whatsapp.net', '@g.us'];
 const SKIP_SUFFIXES = ['@broadcast', '@newsletter'];
@@ -82,6 +83,8 @@ async function handleMessage(sock, msg) {
     ? text.replace(/@\S+/g, '').trim()
     : text;
 
+  incrementMessages();
+  addActiveUser(sender);
   await saveMessage(sender, 'user', cleanText).catch(() => {});
 
   const cmd = matchCommand(cleanText);

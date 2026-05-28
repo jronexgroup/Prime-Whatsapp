@@ -1,0 +1,50 @@
+<%- include('layout', { path: '/dashboard/profile' }) %>
+<div class="card">
+  <h3>Update User Profile</h3>
+  <p class="text-muted mb-12">Edit the bot's memory of a user's profile (name, language, tone).</p>
+  <form id="profileForm">
+    <label>Select User</label>
+    <select id="selectUser">
+      <option value="">— Select —</option>
+      <% (users || []).forEach(u => { %>
+        <option value="<%= u.jid %>" data-name="<%= (u.profile && u.profile.name) || '' %>" data-lang="<%= (u.profile && u.profile.language) || '' %>" data-tone="<%= (u.profile && u.profile.tone) || '' %>" data-rel="<%= (u.profile && u.profile.relationship) || '' %>"><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
+      <% }) %>
+    </select>
+    <label>User JID</label>
+    <input type="text" id="jid" readonly>
+    <label>Name</label>
+    <input type="text" id="name" placeholder="User's name">
+    <label>Language</label>
+    <select id="language"><option value="">Auto</option><option value="Banglish">Banglish</option><option value="Hinglish">Hinglish</option><option value="English">English</option><option value="Bengali">Bengali</option><option value="Hindi">Hindi</option></select>
+    <label>Tone</label>
+    <select id="tone"><option value="">Default</option><option value="friendly">Friendly</option><option value="professional">Professional</option><option value="humorous">Humorous</option><option value="formal">Formal</option></select>
+    <label>Relationship</label>
+    <select id="relationship"><option value="">Default</option><option value="friend">Friend</option><option value="assistant">Assistant</option><option value="teacher">Teacher</option><option value="mentor">Mentor</option></select>
+    <button type="submit">Save Profile</button>
+  </form>
+</div>
+
+<script>
+get('#selectUser').addEventListener('change', (e) => {
+  const opt = e.target.selectedOptions[0];
+  if (!opt) return;
+  get('#jid').value = opt.value;
+  get('#name').value = opt.dataset.name;
+  get('#language').value = opt.dataset.lang;
+  get('#tone').value = opt.dataset.tone;
+  get('#relationship').value = opt.dataset.rel;
+});
+get('#profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!get('#jid').value) { showToast('Select a user first', 'error'); return; }
+  const r = await fetch('/dashboard/profile', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jid: get('#jid').value, name: get('#name').value, language: get('#language').value, tone: get('#tone').value, relationship: get('#relationship').value }),
+  });
+  if (r.ok) showToast('Saved!');
+  else showToast('Failed', 'error');
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

@@ -1,0 +1,55 @@
+<%- include('layout', { path: '/dashboard' }) %>
+<div class="stats">
+  <div class="stat-box">
+    <div class="num" id="state"><%= state %></div>
+    <div class="label">Connection Status</div>
+  </div>
+  <div class="stat-box">
+    <div class="num"><%= stats.messagesToday %></div>
+    <div class="label">Messages Today</div>
+  </div>
+  <div class="stat-box">
+    <div class="num"><%= stats.activeUsers %></div>
+    <div class="label">Active Users</div>
+  </div>
+  <div class="stat-box">
+    <div class="num"><%= userCount %></div>
+    <div class="label">Total Users</div>
+  </div>
+  <div class="stat-box">
+    <div class="num"><%= Math.floor(stats.uptime / 3600000) %>h</div>
+    <div class="label">Uptime</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Quick Actions</h3>
+  <div class="flex-row" style="flex-wrap:wrap">
+    <a href="/dashboard/qr" class="btn">View QR</a>
+    <a href="/dashboard/chat" class="btn">Send Message</a>
+    <a href="/dashboard/broadcast" class="btn">Broadcast</a>
+    <a href="/dashboard/personality" class="btn">Edit Personality</a>
+    <a href="/dashboard/users" class="btn">Manage Users</a>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Bot Status</h3>
+  <p class="text-muted">
+    Status: <span class="badge <%= state === 'open' ? 'connected' : (state === 'scan_qr' ? 'scan_qr' : 'disconnected') %>"><%= state %></span>
+  </p>
+  <% if (state !== 'open') { %>
+    <p class="mt-12">Bot not connected. <a href="/dashboard/qr">Check QR</a> to pair.</p>
+  <% } %>
+</div>
+
+<script>
+setInterval(async () => {
+  const r = await fetch('/api/state');
+  const d = await r.json();
+  document.getElementById('state').textContent = d.state;
+}, 5000);
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>
