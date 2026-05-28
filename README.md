@@ -22,19 +22,21 @@ Prime WhatsApp is not just an auto-reply bot. It's a **memory-aware, personality
 ## 🧠 How It Works
 
 ```
-WhatsApp User
-     ↓
-Baileys WebSocket (Real-time)
-     ↓
-Message Processor
-     ↓
-Firebase Memory → (Profile | Last 20 chats | Long-term summary)
-     ↓
-Gemini AI → Personality-Injected Prompt
-     ↓
-Human-like Reply
-     ↓
-WhatsApp
+WhatsApp User ←→ Baileys WebSocket
+                     ↓
+              Message Processor
+              ↙              ↘
+     Firebase Memory     Cloudflare Workers AI
+     (Profile | Context) (Qwen3 30B)
+              ↘              ↙
+              Human-like Reply
+                     ↓
+                 WhatsApp
+                     
+                Web Dashboard
+         (Express + EJS — port $PORT)
+         QR | Chat | Users | Personality
+         Broadcast | Tasks | Schedule | Memory
 ```
 
 **Memory never dies.** Even if you chat after a week, Prime remembers the context.
@@ -45,13 +47,14 @@ WhatsApp
 
 - 🔌 **Real-time messaging** — Receive & send via WhatsApp WebSocket
 - 🧠 **Firebase Firestore memory** — Stores profiles, messages, and summaries
-- 🤖 **Gemini AI** — Contextual, human-like replies
+- 🤖 **Cloudflare Workers AI (Qwen3 30B)** — Contextual, human-like replies
 - 🎭 **Dynamic personality** — Adapts tone per user (friend, client, family, group)
-- 🌍 **Multi-language** — Bangla, English, Hindi, mixed — it matches you
+- 🌍 **Multi-language** — Banglish, Hinglish, English, Bengali, Hindi — matches your language
 - 👥 **Group support** — Mention-only mode, no spam
 - ⚙️ **Commands** — `.help` `.ping` `.resetmemory` `.summary` `.owner`
 - 🔐 **Secure** — env-based secrets, session encryption, anti-spam queue
 - 🔁 **Auto-reconnect** — Stays online even after disconnects
+- 📊 **Web Dashboard** — Manage everything from your browser (QR, messages, users, personality, broadcasts, tasks)
 
 ---
 
@@ -61,14 +64,25 @@ WhatsApp
 prime-whatsapp/
 ├── src/
 │   ├── index.js            # Entry point
+│   ├── server.js           # Express server (status page + dashboard mount)
 │   ├── config/index.js     # Environment config
 │   ├── socket/index.js     # Baileys WhatsApp connection
-│   ├── firebase/index.js   # Firestore database operations
-│   ├── ai/index.js         # Gemini AI integration
-│   ├── memory/index.js     # Prompt builder with personality injection
+│   ├── firebase/index.js   # Firestore database operations (users, broadcasts, tasks, config)
+│   ├── ai/index.js         # Cloudflare Workers AI integration (Qwen3 30B)
+│   ├── memory/index.js     # Language detection & prompt builder
 │   ├── commands/index.js   # Bot commands (.help, .ping, etc.)
 │   ├── handlers/index.js   # Message processor & auto-summary
-│   └── utils/queue.js      # Rate-limiting & anti-ban queue
+│   ├── utils/queue.js      # Rate-limiting & anti-ban queue
+│   └── dashboard/
+│       ├── server.js       # Dashboard route handlers (auth, views, API)
+│       ├── views/          # EJS templates (12 pages)
+│       │   ├── layout.ejs  login.ejs  index.ejs  qr.ejs
+│       │   ├── chat.ejs  broadcast.ejs  schedule.ejs
+│       │   ├── personality.ejs  profile.ejs  users.ejs
+│       │   ├── memory.ejs  tasks.ejs
+│       └── public/         # Static assets
+│           ├── style.css
+│           └── script.js
 ├── sessions/               # WhatsApp auth (don't share!)
 ├── logs/
 ├── .env                    # Your secrets here
@@ -85,7 +99,7 @@ prime-whatsapp/
 |---|---|
 | **Node.js v18+** | Runtime for the bot |
 | **A Firebase project** | Free tier — stores memory |
-| **A Gemini API key** | Free from Google AI Studio |
+| **A Cloudflare account** | Free Workers AI plan (Qwen3 30B) |
 | **A WhatsApp number** | Secondary number recommended |
 | **A terminal** | Your command center |
 
@@ -93,12 +107,11 @@ prime-whatsapp/
 
 ### 🧩 Step 1: Get Your API Keys
 
-#### 1.1 — Gemini API Key
+#### 1.1 — Cloudflare Workers AI Token
 
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
-2. Click **"Get API Key"**
-3. Create a new key (free tier: 60 requests/min)
-4. Copy it — you'll need this
+1. Go to [Cloudflare Dashboard → Workers & Pages → Workers AI](https://cloudflare.com)
+2. Create an API token with Workers AI permissions
+3. Copy the token — you'll need this as `CF_API_TOKEN`
 
 #### 1.2 — Firebase Credentials
 
@@ -186,16 +199,16 @@ npm start
 Create `.env` in the project root:
 
 ```env
-GEMINI_API_KEY=AIzaSy...
-FIREBASE_PROJECT_ID=prime-whatsapp-xxxxx
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@prime-whatsapp.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
+CF_API_TOKEN=cfut_...
+CF_ACCOUNT_ID=be629d05...
+CF_MODEL=@cf/qwen/qwen3-30b-a3b-fp8
 BOT_NAME=Prime
 BOT_PREFIX=.
 OWNER_NUMBER=919876543210
+DASHBOARD_PASSWORD=your_secure_password
 ```
 
-> ⚠️ Keep the `\n` in the private key — Paste the full key with line breaks replaced by `\n`, or wrap it in double quotes and keep the original line breaks.
+> **Dashboard:** Set `DASHBOARD_PASSWORD` to enable password protection. Omit it and the dashboard is open (dev mode).
 
 ---
 
@@ -232,6 +245,60 @@ Send a message to your bot number:
 | `.resetmemory` | Wipes your memory |
 | `.summary` | Shows what Prime remembers about you |
 | `.owner` | Shows owner contact |
+
+---
+
+## 📊 Web Dashboard
+
+Access the management panel at `http://localhost:3000/dashboard` (or your deployed URL).
+
+### 🔐 Authentication
+
+Set `DASHBOARD_PASSWORD` in your `.env` to enable password protection:
+```env
+DASHBOARD_PASSWORD=your_secure_password
+```
+Without it, the dashboard is open-access (use only in dev/trusted networks). Login page at `/dashboard/login`.
+
+### 📄 Pages
+
+| Page | Route | What You Can Do |
+|------|-------|----------------|
+| **Dashboard** | `/dashboard` | Bot status, messages today, active users, total users, uptime, quick action links |
+| **QR / Pairing** | `/dashboard/qr` | View QR code for WhatsApp pairing, check connection status |
+| **Send Message** | `/dashboard/chat` | Type a message and send it to any WhatsApp number or group (auto-saves to memory) |
+| **Broadcast** | `/dashboard/broadcast` | Create bulk message campaigns, select recipients from user list or paste JIDs, schedule for later |
+| **Schedule** | `/dashboard/schedule` | View all scheduled broadcasts, send pending ones, delete |
+| **Personality** | `/dashboard/personality` | Edit bot name, default language, tone, relationship, and full system prompt — saved to Firebase `config/bot` |
+| **My Profile** | `/dashboard/profile` | Edit individual user profiles — set their name, language preference, tone, and relationship style |
+| **Users** | `/dashboard/users` | List all users who messaged the bot, view their JID and language, reset their memory |
+| **Memory** | `/dashboard/memory` | Select a user to view their stored memory context and full message history |
+| **Tasks** | `/dashboard/tasks` | Create automated tasks: scheduled messages, auto-reply templates, reminders |
+
+### 🔌 API Endpoints (JSON)
+
+These power the dashboard and are available for external integrations:
+
+```
+GET  /api/state                      → Bot connection status, uptime, stats
+GET  /api/users                      → List all users from Firestore
+GET  /api/users/:jid                 → User profile + memory
+GET  /api/users/:jid/messages        → Recent messages for a user
+POST /api/users/:jid/reset           → Clear user memory
+POST /api/broadcasts                 → Create a broadcast campaign
+GET  /api/broadcasts                 → List all broadcasts
+PUT  /api/broadcasts/:id             → Update broadcast
+DEL  /api/broadcasts/:id             → Delete broadcast
+POST /api/broadcasts/:id/send        → Send broadcast immediately
+POST /api/tasks                      → Create an automation task
+GET  /api/tasks                      → List all tasks
+PUT  /api/tasks/:id                  → Update task (enable/disable)
+DEL  /api/tasks/:id                  → Delete task
+GET  /api/config                     → Get bot personality config
+PUT  /api/config                     → Update bot personality config
+```
+
+All API routes return JSON and are subject to the same password auth if `DASHBOARD_PASSWORD` is set.
 
 ---
 
@@ -276,7 +343,7 @@ Over time, Prime builds a deeper understanding of who you are and how you talk.
 | Response time | < 2s | ✅ |
 | Memory retrieval | < 500ms | ✅ |
 | Reconnect recovery | < 10s | ✅ |
-| AI generation | < 1.5s | ✅ (Gemini 2.0 Flash) |
+| AI generation | < 2.5s | ✅ (Qwen3 30B A3B) |
 
 ---
 
@@ -296,12 +363,12 @@ Over time, Prime builds a deeper understanding of who you are and how you talk.
 - 🎨 AI stickers
 - 🤖 Smart auto-replies based on keywords
 
-### V3 (Planned)
+### V3 (Building)
 - 🧠 Multi-agent system
-- 📊 Dashboard panel
+- 📊 Dashboard panel ✅ *(Done — Express + EJS, 10 pages, API)*
 - 👥 Team inbox
 - 🔌 Plugin ecosystem
-- 🏠 Local LLM support (Llama, Mistral)
+- 🏠 Local LLM support (Ollama, Llama)
 
 ---
 
