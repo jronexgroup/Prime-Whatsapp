@@ -1,0 +1,126 @@
+<%- include('layout', { path: '/dashboard/prompts' }) %>
+<div class="card">
+  <h3>New Prompt</h3>
+  <form id="promptForm">
+    <label>Name (unique identifier, no spaces)</label>
+    <input type="text" id="promptName" placeholder="welcome_message" required pattern="[a-zA-Z0-9_]+">
+    <label>Category</label>
+    <select id="promptCategory">
+      <option value="system">System</option>
+      <option value="template">Template</option>
+      <option value="language_detection">Language Detection</option>
+      <option value="personality">Personality</option>
+      <option value="command">Command</option>
+      <option value="other">Other</option>
+    </select>
+    <label>Description</label>
+    <input type="text" id="promptDesc" placeholder="What this prompt is used for">
+    <label>Content</label>
+    <textarea id="promptContent" rows="8" placeholder="The prompt content..."></textarea>
+    <label><input type="checkbox" id="promptActive" checked> Active</label>
+    <button type="submit">Save Prompt</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Prompts (<%= (prompts || []).length %>)</h3>
+  <% if (!prompts || prompts.length === 0) { %>
+    <div class="empty">No prompts yet. Create one above or wait for auto-seed.</div>
+  <% } else { %>
+    <table>
+      <tr><th>Name</th><th>Category</th><th>Description</th><th>Active</th><th>Actions</th></tr>
+      <% prompts.forEach(p => { %>
+        <tr>
+          <td style="font-weight:600"><%= p.name %></td>
+          <td><span class="badge" style="background:#e2e3e5;color:#383d41"><%= p.category || 'other' %></span></td>
+          <td style="font-size:12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= p.description || '' %></td>
+          <td><%= p.active ? '✅' : '❌' %></td>
+          <td>
+            <button class="edit-btn" data-id="<%= p.id %>" data-name="<%= p.name %>" data-category="<%= p.category || '' %>" data-desc="<%= (p.description || '').replace(/"/g, '&quot;') %>" data-content="<%= (p.content || '').replace(/"/g, '&quot;') %>" data-active="<%= p.active %>" style="font-size:12px;padding:4px 10px">Edit</button>
+            <button class="del-prompt-btn" data-id="<%= p.id %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Del</button>
+          </td>
+        </tr>
+      <% }) %>
+    </table>
+  <% } %>
+</div>
+
+<div id="editModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:640px;max-width:90vw;max-height:90vh;overflow-y:auto">
+    <h3 style="margin-bottom:16px">Edit Prompt</h3>
+    <form id="editForm">
+      <input type="hidden" id="editId">
+      <label>Name</label>
+      <input type="text" id="editName" required pattern="[a-zA-Z0-9_]+">
+      <label>Category</label>
+      <select id="editCategory">
+        <option value="system">System</option>
+        <option value="template">Template</option>
+        <option value="language_detection">Language Detection</option>
+        <option value="personality">Personality</option>
+        <option value="command">Command</option>
+        <option value="other">Other</option>
+      </select>
+      <label>Description</label>
+      <input type="text" id="editDesc">
+      <label>Content</label>
+      <textarea id="editContent" rows="8"></textarea>
+      <label><input type="checkbox" id="editActive"> Active</label>
+      <div class="flex-row mt-12">
+        <button type="submit">Update</button>
+        <button type="button" class="secondary" onclick="get('#editModal').style.display='none'">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+get('#promptForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = {
+    name: get('#promptName').value,
+    category: get('#promptCategory').value,
+    description: get('#promptDesc').value,
+    content: get('#promptContent').value,
+    active: get('#promptActive').checked,
+  };
+  const r = await api('POST', '/api/prompts', data);
+  if (r) { showToast('Prompt created!'); location.reload(); }
+});
+
+document.querySelectorAll('.edit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    get('#editId').value = btn.dataset.id;
+    get('#editName').value = btn.dataset.name;
+    get('#editCategory').value = btn.dataset.category;
+    get('#editDesc').value = btn.dataset.desc;
+    get('#editContent').value = btn.dataset.content;
+    get('#editActive').checked = btn.dataset.active === 'true';
+    get('#editModal').style.display = 'flex';
+  });
+});
+
+get('#editForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = {
+    name: get('#editName').value,
+    category: get('#editCategory').value,
+    description: get('#editDesc').value,
+    content: get('#editContent').value,
+    active: get('#editActive').checked,
+  };
+  const r = await api('PUT', `/api/prompts/${get('#editId').value}`, data);
+  if (r?.ok) { showToast('Updated!'); get('#editModal').style.display = 'none'; location.reload(); }
+});
+
+document.querySelectorAll('.del-prompt-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete this prompt?')) return;
+    const r = await api('DELETE', `/api/prompts/${btn.dataset.id}`);
+    if (r?.ok) { showToast('Deleted'); location.reload(); }
+  });
+});
+</script>
+</div></div>
+<script src="/static/script.js"></script>
+</body></html>

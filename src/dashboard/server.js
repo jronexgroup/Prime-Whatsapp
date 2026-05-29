@@ -8,6 +8,7 @@ import {
   listBroadcasts, createBroadcast, updateBroadcast, deleteBroadcast,
   listTasks, createTask, updateTask, deleteTask,
   getBotConfig, updateBotConfig,
+  listPrompts, createPrompt, updatePrompt, deletePrompt, seedPrompts,
 } from '../firebase/index.js';
 
 export const dashboardRouter = Router();
@@ -284,6 +285,38 @@ dashboardRouter.delete('/api/tasks/:id', async (req, res) => {
     res.json({ ok });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── Prompts ──
+
+dashboardRouter.get('/dashboard/prompts', async (req, res) => {
+  let prompts = [];
+  try { prompts = await listPrompts() || []; } catch {}
+  res.render('prompts', { prompts });
+});
+
+dashboardRouter.post('/api/prompts', async (req, res) => {
+  try {
+    const p = await createPrompt({ ...req.body, active: req.body.active !== undefined ? req.body.active : true });
+    res.json(p || { error: 'Failed' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dashboardRouter.put('/api/prompts/:id', async (req, res) => {
+  try {
+    const ok = await updatePrompt(req.params.id, req.body);
+    res.json({ ok });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dashboardRouter.delete('/api/prompts/:id', async (req, res) => {
+  try {
+    const ok = await deletePrompt(req.params.id);
+    res.json({ ok });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Seed prompts on first dashboard load
+seedPrompts();
 
 // ── API: State ──
 
