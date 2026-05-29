@@ -1,6 +1,6 @@
 import { createSocket, setReconnectHandler, getSocket } from './socket/index.js';
 import { setupHandlers } from './handlers/index.js';
-import { initFirebase } from './firebase/index.js';
+import { initFirebase, seedPrompts } from './firebase/index.js';
 import { initAI } from './ai/index.js';
 import { startServer, setState } from './server.js';
 
@@ -9,6 +9,7 @@ console.log('Stop anytime with: Ctrl+C (or npm run stop)');
 
 startServer();
 initFirebase();
+seedPrompts();
 initAI();
 
 const sock = await createSocket();

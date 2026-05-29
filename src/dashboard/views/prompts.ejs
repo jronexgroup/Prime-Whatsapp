@@ -1,4 +1,8 @@
 <%- include('layout', { path: '/dashboard/prompts' }) %>
+<%
+const protectedNames = ['system_prompt', 'prompt_template', 'banglish_words', 'hindi_words', 'language_rules', 'classification_rules', 'command_responses', 'memory_context_template'];
+function isProtected(name) { return protectedNames.includes(name); }
+%>
 <div class="card">
   <h3>New Prompt</h3>
   <form id="promptForm">
@@ -30,14 +34,15 @@
     <table>
       <tr><th>Name</th><th>Category</th><th>Description</th><th>Active</th><th>Actions</th></tr>
       <% prompts.forEach(p => { %>
+        <% const prot = isProtected(p.name); %>
         <tr>
-          <td style="font-weight:600"><%= p.name %></td>
+          <td style="font-weight:600"><%= p.name %><% if (prot) { %><span style="color:#dc3545;font-size:11px;margin-left:6px" title="Protected">🔒</span><% } %></td>
           <td><span class="badge" style="background:#e2e3e5;color:#383d41"><%= p.category || 'other' %></span></td>
           <td style="font-size:12px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= p.description || '' %></td>
           <td><%= p.active ? '✅' : '❌' %></td>
           <td>
-            <button class="edit-btn" data-id="<%= p.id %>" data-name="<%= p.name %>" data-category="<%= p.category || '' %>" data-desc="<%= (p.description || '').replace(/"/g, '&quot;') %>" data-content="<%= (p.content || '').replace(/"/g, '&quot;') %>" data-active="<%= p.active %>" style="font-size:12px;padding:4px 10px">Edit</button>
-            <button class="del-prompt-btn" data-id="<%= p.id %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Del</button>
+            <button class="edit-btn" data-id="<%= p.id %>" data-pname="<%= p.name %>" data-protected="<%= prot %>" data-category="<%= p.category || '' %>" data-desc="<%= (p.description || '').replace(/"/g, '&quot;') %>" data-content="<%= (p.content || '').replace(/"/g, '&quot;') %>" data-active="<%= p.active %>" style="font-size:12px;padding:4px 10px">Edit</button>
+            <button class="del-prompt-btn" data-id="<%= p.id %>" data-pname="<%= p.name %>" data-protected="<%= prot %>" style="font-size:12px;padding:4px 10px;background:#dc3545">Del</button>
           </td>
         </tr>
       <% }) %>
@@ -50,6 +55,7 @@
     <h3 style="margin-bottom:16px">Edit Prompt</h3>
     <form id="editForm">
       <input type="hidden" id="editId">
+      <input type="hidden" id="editPassword">
       <label>Name</label>
       <input type="text" id="editName" required pattern="[a-zA-Z0-9_]+">
       <label>Category</label>
@@ -75,6 +81,9 @@
 </div>
 
 <script>
+const PROTECTED = <%= JSON.stringify(protectedNames) %>;
+function askPassword() { return prompt('Enter admin password for protected prompt:'); }
+
 get('#promptForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = {
@@ -90,8 +99,15 @@ get('#promptForm').addEventListener('submit', async (e) => {
 
 document.querySelectorAll('.edit-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const isProtected = btn.dataset.protected === 'true';
+    let pw = '';
+    if (isProtected) {
+      pw = askPassword();
+      if (!pw) return;
+    }
     get('#editId').value = btn.dataset.id;
-    get('#editName').value = btn.dataset.name;
+    get('#editName').value = btn.dataset.pname;
+    get('#editPassword').value = pw;
     get('#editCategory').value = btn.dataset.category;
     get('#editDesc').value = btn.dataset.desc;
     get('#editContent').value = btn.dataset.content;
@@ -108,16 +124,26 @@ get('#editForm').addEventListener('submit', async (e) => {
     description: get('#editDesc').value,
     content: get('#editContent').value,
     active: get('#editActive').checked,
+    password: get('#editPassword').value,
   };
   const r = await api('PUT', `/api/prompts/${get('#editId').value}`, data);
-  if (r?.ok) { showToast('Updated!'); get('#editModal').style.display = 'none'; location.reload(); }
+  if (r && r.ok) { showToast('Updated!'); get('#editModal').style.display = 'none'; location.reload(); }
+  else if (r && r.error) showToast(r.error, 'error');
 });
 
 document.querySelectorAll('.del-prompt-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     if (!confirm('Delete this prompt?')) return;
-    const r = await api('DELETE', `/api/prompts/${btn.dataset.id}`);
-    if (r?.ok) { showToast('Deleted'); location.reload(); }
+    const isProtected = btn.dataset.protected === 'true';
+    let pw = '', url = `/api/prompts/${btn.dataset.id}?name=${encodeURIComponent(btn.dataset.pname)}`;
+    if (isProtected) {
+      pw = askPassword();
+      if (!pw) return;
+      url += `&password=${encodeURIComponent(pw)}`;
+    }
+    const r = await fetch(url, { method: 'DELETE' });
+    if (r.ok) { showToast('Deleted'); location.reload(); }
+    else { const d = await r.json().catch(() => ({})); showToast(d.error || 'Delete failed', 'error'); }
   });
 });
 </script>

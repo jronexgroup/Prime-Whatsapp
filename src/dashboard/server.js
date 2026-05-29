@@ -301,22 +301,38 @@ dashboardRouter.post('/api/prompts', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+const PROTECTED_PROMPTS = ['system_prompt', 'prompt_template', 'banglish_words', 'hindi_words', 'language_rules', 'classification_rules', 'command_responses', 'memory_context_template'];
+const PROMPT_PASSWORD = '12345678';
+
+function checkPromptPassword(name, password) {
+  if (!PROTECTED_PROMPTS.includes(name)) return true;
+  return password === PROMPT_PASSWORD;
+}
+
 dashboardRouter.put('/api/prompts/:id', async (req, res) => {
   try {
-    const ok = await updatePrompt(req.params.id, req.body);
+    if (!checkPromptPassword(req.body.name, req.body.password)) {
+      res.status(401).json({ error: 'Wrong password. This prompt is protected.' });
+      return;
+    }
+    const { password, ...data } = req.body;
+    const ok = await updatePrompt(req.params.id, data);
     res.json({ ok });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 dashboardRouter.delete('/api/prompts/:id', async (req, res) => {
   try {
+    if (!checkPromptPassword(req.query.name, req.query.password)) {
+      res.status(401).json({ error: 'Wrong password. This prompt is protected.' });
+      return;
+    }
     const ok = await deletePrompt(req.params.id);
     res.json({ ok });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Seed prompts on first dashboard load
-seedPrompts();
+
 
 // ── API: State ──
 

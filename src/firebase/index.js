@@ -377,20 +377,49 @@ Be natural, 1-3 sentences, never repeat their question, no honorifics like didi/
     description: 'Rules for language detection: suffix patterns, weights, and scoring thresholds',
     active: true,
   },
+  {
+    name: 'classification_rules',
+    category: 'language_detection',
+    content: 'if (bnScore > hiScore && bnScore >= 2) -> Banglish\nif (hiScore > bnScore && hiScore >= 2) -> Hinglish\nif (bnScore === hiScore && bnScore >= 4) -> Banglish\nif (bnScore === hiScore && hiScore >= 4) -> Hinglish\notherwise -> English\n\nUnicode pre-check:\n  Bengali range \\u0980-\\u09FF -> Bengali\n  Devanagari range \\u0900-\\u097F -> Hindi\n  Arabic, Russian, Tamil ranges -> respective language',
+    description: 'Final classification logic that decides language after scoring',
+    active: true,
+  },
+  {
+    name: 'command_responses',
+    category: 'command',
+    content: '.help -> "{botName} Commands:\\n.help — Show this message\\n.ping — Check if bot is alive\\n.resetmemory — Reset your memory\\n.summary — Show your memory summary\\n.owner — Contact the owner"\n.ping -> "pong!"\n.resetmemory -> "Your memory has been reset."\n.summary -> "Your Memory Summary:\\n{memory.summary}"\n.owner -> "Owner: wa.me/{ownerNumber}"',
+    description: 'Hardcoded reply templates for each bot command',
+    active: true,
+  },
+  {
+    name: 'memory_context_template',
+    category: 'template',
+    content: 'User: {userMessage} | {botName}: {botReply}',
+    description: 'Format used when appending each exchange to memory.context in Firestore. New entries separated by newline, total capped at 2500 chars.',
+    active: true,
+  },
 ];
 
 export async function seedPrompts() {
-  if (!db) return;
+  if (!db) { console.warn('seedPrompts: db not initialized'); return; }
   const existing = await listPrompts();
-  if (existing.length > 0) return;
+  if (existing === null) {
+    console.warn('seedPrompts: listPrompts returned null — Firestore API likely returning errors (check token)');
+    return;
+  }
+  if (existing.length > 0) {
+    console.log(`seedPrompts: ${existing.length} prompts already exist, skipping`);
+    return;
+  }
+  let seeded = 0;
   for (const p of SEED_PROMPTS) {
-    await api('prompts', {
+    const result = await api('prompts', {
       method: 'POST',
       body: JSON.stringify(makeDoc(null, p)),
     });
+    if (result) seeded++;
   }
-  const count = SEED_PROMPTS.length;
-  console.log(`Seeded ${count} prompts to Firestore`);
+  console.log(`Seeded ${seeded}/${SEED_PROMPTS.length} prompts to Firestore`);
 }
 
 // ── Bot Config ──
