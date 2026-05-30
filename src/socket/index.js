@@ -12,12 +12,35 @@ let reconnectAttempt = 0;
 let creating = false;
 let sessionCleared = false;
 
+const contactsCache = new Map();
+
 export function getSocket() {
   return currentSock;
 }
 
 export function setReconnectHandler(handler) {
   onReconnect = handler;
+}
+
+export function getContacts() {
+  return [...contactsCache.values()];
+}
+
+export function getContact(jid) {
+  return contactsCache.get(jid);
+}
+
+export function isLid(jid) {
+  return jid.endsWith('@lid');
+}
+
+export function extractPhone(jid) {
+  if (jid.endsWith('@s.whatsapp.net')) return jid.split('@')[0];
+  if (jid.endsWith('@lid')) {
+    const c = contactsCache.get(jid);
+    if (c) return c.id?.split('@')[0] || null;
+  }
+  return null;
 }
 
 function clearSession() {
@@ -48,7 +71,7 @@ export async function createSocket() {
     auth: state,
     logger: pino({ level: 'fatal' }),
     browser: ['Prime WhatsApp', 'Chrome', '120.0'],
-    syncFullHistory: false,
+    syncFullHistory: true,
     markOnlineOnConnect: false,
     generateHighQualityLinkPreview: false,
     keepAliveIntervalMs: 30000,
@@ -56,6 +79,22 @@ export async function createSocket() {
   });
 
   sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('contacts.set', ({ contacts }) => {
+    contacts.forEach(c => contactsCache.set(c.id, c));
+    console.log(`[Contacts] Initial set: ${contacts.length} contacts loaded`);
+  });
+
+  sock.ev.on('contacts.upsert', (contacts) => {
+    contacts.forEach(c => contactsCache.set(c.id, c));
+  });
+
+  sock.ev.on('contacts.update', (updates) => {
+    updates.forEach(u => {
+      const existing = contactsCache.get(u.id);
+      if (existing) contactsCache.set(u.id, { ...existing, ...u });
+    });
+  });
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     setState(qr ? 'scan_qr' : connection);

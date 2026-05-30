@@ -209,6 +209,32 @@ pre { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; 
 .login-box input { margin-bottom: 16px; }
 .error { color: #dc3545; font-size: 13px; margin-bottom: 12px; }
 
+/* ── Contact Picker ── */
+.contact-picker { position: relative; margin-bottom: 12px; }
+.contact-picker .selected-name { font-weight: 600; color: #075e54; margin-bottom: 4px; }
+.contact-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 100;
+  background: #fff; border: 1px solid #ddd; border-radius: 6px;
+  max-height: 280px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+.contact-dropdown .item {
+  padding: 10px 14px; cursor: pointer; font-size: 13px;
+  border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;
+}
+.contact-dropdown .item:hover { background: #f0fdf4; }
+.contact-dropdown .item .name { font-weight: 600; color: #1a1a2e; }
+.contact-dropdown .item .meta { color: #999; font-size: 11px; }
+.contact-dropdown .item .jid-hint { color: #bbb; font-size: 10px; }
+.contact-dropdown .manual-item { color: #25D366; font-weight: 600; font-style: italic; }
+.contact-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.contact-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #e8f5e9; color: #075e54; padding: 4px 10px;
+  border-radius: 14px; font-size: 12px; font-weight: 600;
+}
+.contact-tag .remove { cursor: pointer; font-size: 14px; line-height: 1; color: #999; }
+.contact-tag .remove:hover { color: #dc3545; }
+
 /* ── Toast ── */
 .toast {
   position: fixed;

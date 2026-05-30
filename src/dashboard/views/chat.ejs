@@ -2,13 +2,12 @@
 <div class="card">
   <h3>Send Message</h3>
   <form id="sendForm">
-    <label>Recipient JID</label>
-    <input type="text" id="jid" list="userList" placeholder="919876543210@s.whatsapp.net" required autocomplete="off">
-    <datalist id="userList">
-      <% (users || []).forEach(u => { %>
-        <option value="<%= u.jid %>"><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
-      <% }) %>
-    </datalist>
+    <div class="contact-picker">
+      <label>Recipient</label>
+      <input type="text" id="contactSearch" placeholder="Search contacts or type a number..." autocomplete="off">
+      <input type="hidden" id="jid" name="jid">
+      <div id="contactDropdown" class="contact-dropdown" style="display:none"></div>
+    </div>
     <label>Message</label>
     <textarea id="message" rows="4" placeholder="Type your message..." required></textarea>
     <button type="submit">Send Now</button>
@@ -16,17 +15,22 @@
 </div>
 
 <script>
+const contacts = <%- JSON.stringify(contacts || []) %>;
+createContactPicker('#contactSearch', '#jid', '#contactDropdown', contacts);
+
 get('#sendForm').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const jid = get('#jid').value;
+  if (!jid) { showToast('Select a recipient first', 'error'); return; }
   const btn = e.target.querySelector('button');
   btn.disabled = true; btn.textContent = 'Sending...';
   const r = await fetch('/dashboard/chat/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jid: get('#jid').value, message: get('#message').value }),
+    body: JSON.stringify({ jid, message: get('#message').value }),
   });
   btn.disabled = false; btn.textContent = 'Send Now';
-  if (r.ok) { showToast('Message sent!'); get('#message').value = ''; }
+  if (r.ok) { showToast('Message sent!'); get('#message').value = ''; get('#jid').value = ''; get('#contactSearch').value = ''; }
   else { const d = await r.json().catch(() => ({})); showToast(d.error || 'Failed', 'error'); }
 });
 </script>

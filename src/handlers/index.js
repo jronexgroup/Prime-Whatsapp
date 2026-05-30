@@ -1,10 +1,11 @@
-import { getDb, saveMessage, updateMemorySummary, getUserMemory } from '../firebase/index.js';
+import { getDb, saveMessage, updateMemorySummary, getUserMemory, createOrUpdateUser } from '../firebase/index.js';
+import { getContact, isLid, extractPhone } from '../socket/index.js';
 import { matchCommand } from '../commands/index.js';
 import { buildPrompt } from '../memory/index.js';
 import { generateReply } from '../ai/index.js';
 import { messageQueue } from '../utils/queue.js';
 import { config } from '../config/index.js';
-import { incrementMessages, addActiveUser } from '../server.js';
+import { incrementMessages, addActiveUser, getRepliesEnabled } from '../server.js';
 
 const VALID_JID_SUFFIXES = ['@s.whatsapp.net', '@g.us'];
 const SKIP_SUFFIXES = ['@broadcast', '@newsletter'];
@@ -69,6 +70,19 @@ async function handleMessage(sock, msg) {
   const sender = msg.key.participant || jid;
   const pushName = msg.pushName || 'User';
 
+  const contact = getContact(sender);
+  const phoneNumber = extractPhone(sender) || sender.split('@')[0] || null;
+  const displayName = contact?.name || pushName;
+  const isContactSaved = !!contact?.name;
+
+  createOrUpdateUser(sender, {
+    jid: sender,
+    phoneNumber,
+    displayName,
+    pushName,
+    isContactSaved,
+  }).catch(() => {});
+
   console.log(`📩 Message from ${pushName} (${sender}): ${text.substring(0, 60)}`);
 
   const isGroup = jid.endsWith('@g.us');
@@ -86,6 +100,11 @@ async function handleMessage(sock, msg) {
   incrementMessages();
   addActiveUser(sender);
   await saveMessage(sender, 'user', cleanText).catch(() => {});
+
+  if (!getRepliesEnabled()) {
+    console.log(`[OFF] Replies disabled — message stored but not answered`);
+    return;
+  }
 
   const cmd = matchCommand(cleanText);
   if (cmd) {

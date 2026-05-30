@@ -1,16 +1,25 @@
 <%- include('layout', { path: '/dashboard/memory' }) %>
 <div class="card">
   <h3>User Memory Viewer</h3>
-  <form method="GET" action="/dashboard/memory">
-    <label>Select User</label>
-    <select name="jid" onchange="this.form.submit()">
-      <option value="">— Select —</option>
-      <% (users || []).forEach(u => { %>
-        <option value="<%= u.jid %>" <%= jid === u.jid ? 'selected' : '' %>><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
-      <% }) %>
-    </select>
+  <form method="GET" action="/dashboard/memory" id="memoryForm">
+    <div class="contact-picker">
+      <label>Select User</label>
+      <% const selectedContact = jid ? contacts.find(c => c.jid === jid) : null; %>
+      <% const selectedLabel = selectedContact ? (selectedContact.displayName || selectedContact.phoneNumber || selectedContact.pushName || jid.split('@')[0] || jid) : ''; %>
+      <input type="text" id="contactSearch" placeholder="Search contacts..." autocomplete="off" value="<%= selectedLabel %>">
+      <input type="hidden" id="jid" name="jid" value="<%= jid || '' %>">
+      <div id="contactDropdown" class="contact-dropdown" style="display:none"></div>
+    </div>
   </form>
 </div>
+
+<script>
+function contactLabel(c) { return c.displayName || c.phoneNumber || c.pushName || c.jid?.split('@')[0] || 'Unknown'; }
+const contacts = <%- JSON.stringify(contacts || []) %>;
+createContactPicker('#contactSearch', '#jid', '#contactDropdown', contacts, {
+  onSelect: () => get('#memoryForm').submit()
+});
+</script>
 
 <% if (jid) { %>
   <div class="card">

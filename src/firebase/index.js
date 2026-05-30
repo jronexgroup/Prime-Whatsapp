@@ -3,38 +3,61 @@ import { homedir } from 'os';
 import { resolve } from 'path';
 
 const PROJECT_ID = 'cousin-hub';
+const FIREBASE_API_KEY = 'AIzaSyBgACJP5o6XphYLcplCpj0_z9B_jj5fLQY';
 const FIRESTORE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 let db = null;
 let tokenData = null;
 
-function loadTokens() {
+function loadCliTokens() {
   const configPath = resolve(homedir(), '.config/configstore/firebase-tools.json');
   if (!existsSync(configPath)) return null;
   try {
     const raw = readFileSync(configPath, 'utf8');
     return JSON.parse(raw).tokens || null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-async function getValidToken() {
-  tokenData = tokenData || loadTokens();
-  if (!tokenData) return null;
-
-  if (Date.now() >= tokenData.expires_at) {
-    await refreshToken();
-  }
-  return tokenData.access_token;
-}
-
-async function refreshToken() {
+async function getAnonymousToken() {
   try {
-    const res = await fetch('https://securetoken.googleapis.com/v1/token?key=AIzaSyB4pR7TfAcFId8lBPZyfQDvPkMnY4I2JYc', {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify({ returnSecureToken: true }),
+    });
+    const data = await res.json();
+    if (data.idToken) {
+      tokenData = {
+        access_token: data.idToken,
+        refresh_token: data.refreshToken,
+        expires_at: Date.now() + parseInt(data.expiresIn || '3600') * 1000,
+        type: 'firebase',
+      };
+      console.log('Firebase: anonymous auth token acquired');
+      return data.idToken;
+    }
+    console.warn('Firebase: anonymous auth failed:', data.error?.message || JSON.stringify(data).substring(0, 100));
+  } catch (err) {
+    console.warn('Firebase: anonymous auth error:', err.message);
+  }
+  return null;
+}
+
+async function getOAuthToken() {
+  const tokens = loadCliTokens();
+  if (!tokens?.access_token) {
+    console.warn('Firebase: no CLI tokens found — run: firebase login --reauth');
+    return null;
+  }
+  tokenData = { ...tokens, type: 'oauth' };
+  if (Date.now() < tokenData.expires_at) {
+    return tokenData.access_token;
+  }
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: tokenData.refresh_token,
       }),
@@ -43,10 +66,53 @@ async function refreshToken() {
     if (data.access_token) {
       tokenData.access_token = data.access_token;
       tokenData.expires_at = Date.now() + (data.expires_in || 3600) * 1000;
+      console.log('Firebase: OAuth token refreshed');
+      return data.access_token;
     }
+    console.warn('Firebase: OAuth refresh failed — run: firebase login --reauth');
   } catch (err) {
-    console.warn('Token refresh failed:', err.message);
+    console.warn('Firebase: OAuth refresh error:', err.message);
   }
+  return null;
+}
+
+async function getValidToken() {
+  if (tokenData?.access_token && Date.now() < tokenData.expires_at) {
+    return tokenData.access_token;
+  }
+
+  if (tokenData?.type === 'oauth' && tokenData?.refresh_token) {
+    const tok = await getOAuthToken();
+    if (tok) return tok;
+  }
+
+  if (tokenData?.type === 'firebase' && tokenData?.refresh_token) {
+    try {
+      const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grant_type: 'refresh_token',
+          refresh_token: tokenData.refresh_token,
+        }),
+      });
+      const data = await res.json();
+      if (data.id_token || data.access_token) {
+        tokenData.access_token = data.id_token || data.access_token;
+        tokenData.expires_at = Date.now() + (data.expires_in || 3600) * 1000;
+        return tokenData.access_token;
+      }
+    } catch {}
+  }
+
+  const anon = await getAnonymousToken();
+  if (anon) return anon;
+
+  const oauth = await getOAuthToken();
+  if (oauth) return oauth;
+
+  console.warn('Firebase: no valid token — Firestore features disabled');
+  return null;
 }
 
 async function api(path, opts = {}) {
@@ -107,14 +173,14 @@ function makeDoc(name, data) {
 }
 
 export function initFirebase() {
-  const tokens = loadTokens();
-  if (!tokens) {
-    console.warn('Firebase CLI tokens not found — memory features disabled');
-    return null;
-  }
-  tokenData = tokens;
   db = {};
-  console.log('Firebase connected (project:', PROJECT_ID + ')');
+  tokenData = loadCliTokens();
+  if (tokenData?.access_token) {
+    tokenData = { ...tokenData, type: 'oauth' };
+    console.log('Firebase: CLI tokens loaded (project:', PROJECT_ID + ')');
+  } else {
+    console.log('Firebase: will use anonymous auth (project:', PROJECT_ID + ')');
+  }
   return db;
 }
 
@@ -122,21 +188,28 @@ export function getDb() {
   return db;
 }
 
+const DOCUMENTS_PARENT = `projects/${PROJECT_ID}/databases/(default)/documents`;
+
 async function listCollection(collectionPath, opts = {}) {
   const parts = collectionPath.split('/');
-  let parent = '';
-  let collectionId = parts[parts.length - 1];
-  if (parts.length > 1) {
-    parent = parts.slice(0, -1).join('/');
+  const collectionId = parts[parts.length - 1];
+  const parent = parts.length > 1
+    ? `${DOCUMENTS_PARENT}/${parts.slice(0, -1).join('/')}`
+    : DOCUMENTS_PARENT;
+
+  const body = { parent, structuredQuery: { from: [{ collectionId }] } };
+  if (opts.pageSize) body.structuredQuery.limit = opts.pageSize;
+  if (opts.orderBy) {
+    const dir = opts.orderBy.endsWith(' desc') ? 'DESCENDING' : 'ASCENDING';
+    body.structuredQuery.orderBy = [{ field: { fieldPath: opts.orderBy.replace(/ (asc|desc)$/i, '') }, direction: dir }];
   }
 
-  const params = new URLSearchParams();
-  params.set('collectionId', collectionId);
-  if (opts.pageSize) params.set('pageSize', opts.pageSize);
-  if (opts.orderBy) params.set('orderBy', opts.orderBy);
-  if (parent) params.set('parent', `projects/${PROJECT_ID}/databases/(default)/documents/${parent}`);
-
-  return api(`:listDocuments?${params.toString()}`, { method: 'POST' });
+  const result = await api(':runQuery', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  if (!result || !Array.isArray(result)) return null;
+  return { documents: result.map(r => r.document).filter(Boolean) };
 }
 
 // ── Users ──
@@ -192,13 +265,22 @@ export async function updateProfile(jid, profile) {
   });
 }
 
-export async function updateMemorySummary(jid, summary) {
+export async function createOrUpdateUser(jid, data) {
+  if (!db) return;
+  const fieldPaths = Object.keys(data).join(',');
+  await api(`users/${encodeURIComponent(jid)}?updateMask.fieldPaths=${fieldPaths}`, {
+    method: 'PATCH',
+    body: JSON.stringify(makeDoc(null, data)),
+  });
+}
+
+export async function updateMemorySummary(jid, context) {
   if (!db) return;
   await api(`users/${encodeURIComponent(jid)}?updateMask.fieldPaths=memory`, {
     method: 'PATCH',
     body: JSON.stringify({
       fields: {
-        memory: { mapValue: { fields: objToFields({ summary }) } }
+        memory: { mapValue: { fields: objToFields({ context }) } }
       },
     }),
   });

@@ -5,11 +5,14 @@
     <div class="empty">No users found. Users appear when they message the bot.</div>
   <% } else { %>
     <table>
-      <tr><th>Name</th><th>JID</th><th>Language</th><th>Actions</th></tr>
+      <tr><th>Name</th><th>Phone</th><th>JID</th><th>Saved</th><th>Push Name</th><th>Language</th><th>Actions</th></tr>
       <% users.forEach(u => { %>
         <tr>
-          <td><%= (u.profile && u.profile.name) || '—' %></td>
+          <td><%= u.displayName || (u.profile && u.profile.name) || '—' %></td>
+          <td><%= u.phoneNumber || '—' %></td>
           <td style="font-size:12px;word-break:break-all"><%= u.jid %></td>
+          <td><%= u.isContactSaved ? '✓' : '—' %></td>
+          <td><%= u.pushName || '—' %></td>
           <td><%= (u.profile && u.profile.language) || 'auto' %></td>
           <td>
             <a href="/dashboard/memory?jid=<%= encodeURIComponent(u.jid) %>" class="btn" style="font-size:12px;padding:4px 10px">Memory</a>

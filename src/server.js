@@ -5,6 +5,7 @@ import { existsSync } from 'fs';
 
 let state = 'starting';
 let qrData = null;
+let repliesEnabled = true;
 
 const stats = {
   messagesToday: 0,
@@ -26,6 +27,8 @@ export function getState() { return state; }
 export function getQR() { return qrData; }
 export function incrementMessages() { stats.messagesToday++; }
 export function addActiveUser(jid) { stats.activeUsers.add(jid); }
+export function getRepliesEnabled() { return repliesEnabled; }
+export function setRepliesEnabled(v) { repliesEnabled = v; }
 export function getStats() {
   return {
     messagesToday: stats.messagesToday,

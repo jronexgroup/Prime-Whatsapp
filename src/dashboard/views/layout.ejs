@@ -25,6 +25,34 @@
       <a href="/dashboard/prompts" class="<%= path === '/dashboard/prompts' ? 'active' : '' %>">Prompts</a>
       <a href="/dashboard/tasks" class="<%= path === '/dashboard/tasks' ? 'active' : '' %>">Tasks</a>
       <hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:20px;">
+      <div style="padding:0 20px;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;color:rgba(255,255,255,.85);font-size:13px">
+          <span style="flex:1">Bot Replies</span>
+          <span class="toggle-track" id="repliesToggle" style="
+            width:44px; height:24px; border-radius:12px; background:#666; 
+            position:relative; cursor:pointer; transition:background .2s;
+          ">
+            <span class="toggle-knob" style="
+              width:20px; height:20px; border-radius:50%; background:#fff;
+              position:absolute; top:2px; left:2px; transition:left .2s;
+            "></span>
+          </span>
+        </label>
+      </div>
       <a href="/dashboard/logout">Logout</a>
     </nav>
+    <script>
+    fetch('/api/state').then(r=>r.json()).then(s => {
+      const t = document.getElementById('repliesToggle');
+      t.style.background = s.repliesEnabled ? '#25D366' : '#666';
+      t.querySelector('.toggle-knob').style.left = s.repliesEnabled ? '22px' : '2px';
+      t.onclick = () => {
+        const newVal = !s.repliesEnabled;
+        t.style.background = newVal ? '#25D366' : '#666';
+        t.querySelector('.toggle-knob').style.left = newVal ? '22px' : '2px';
+        fetch('/api/toggle-replies', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({enabled:newVal}) });
+        s.repliesEnabled = newVal;
+      };
+    });
+    </script>
     <div class="main">

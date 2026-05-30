@@ -3,15 +3,12 @@
   <h3>Update User Profile</h3>
   <p class="text-muted mb-12">Edit the bot's memory of a user's profile (name, language, tone).</p>
   <form id="profileForm">
-    <label>Select User</label>
-    <select id="selectUser">
-      <option value="">— Select —</option>
-      <% (users || []).forEach(u => { %>
-        <option value="<%= u.jid %>" data-name="<%= (u.profile && u.profile.name) || '' %>" data-lang="<%= (u.profile && u.profile.language) || '' %>" data-tone="<%= (u.profile && u.profile.tone) || '' %>" data-rel="<%= (u.profile && u.profile.relationship) || '' %>"><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
-      <% }) %>
-    </select>
-    <label>User JID</label>
-    <input type="text" id="jid" readonly>
+    <div class="contact-picker">
+      <label>Select User</label>
+      <input type="text" id="contactSearch" placeholder="Search contacts..." autocomplete="off">
+      <input type="hidden" id="jid" name="jid">
+      <div id="contactDropdown" class="contact-dropdown" style="display:none"></div>
+    </div>
     <label>Name</label>
     <input type="text" id="name" placeholder="User's name">
     <label>Language</label>
@@ -25,14 +22,11 @@
 </div>
 
 <script>
-get('#selectUser').addEventListener('change', (e) => {
-  const opt = e.target.selectedOptions[0];
-  if (!opt) return;
-  get('#jid').value = opt.value;
-  get('#name').value = opt.dataset.name;
-  get('#language').value = opt.dataset.lang;
-  get('#tone').value = opt.dataset.tone;
-  get('#relationship').value = opt.dataset.rel;
+const contacts = <%- JSON.stringify(contacts || []) %>;
+createContactPicker('#contactSearch', '#jid', '#contactDropdown', contacts, {
+  onSelect: (jid, c) => {
+    if (c && c.displayName) get('#name').value = c.displayName;
+  }
 });
 get('#profileForm').addEventListener('submit', async (e) => {
   e.preventDefault();

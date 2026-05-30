@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createHash } from 'crypto';
-import { getState, getQR, getStats, incrementMessages } from '../server.js';
-import { getSocket } from '../socket/index.js';
+import { getState, getQR, getStats, incrementMessages, getRepliesEnabled, setRepliesEnabled } from '../server.js';
+import { getSocket, getContacts as getBaileysContacts } from '../socket/index.js';
 import {
   getUserProfile, getUserMemory, getRecentMessages, saveMessage,
   updateProfile, updateMemorySummary, listUsers,
@@ -79,9 +79,10 @@ dashboardRouter.get('/dashboard/qr', (req, res) => {
 // ── Chat (Send Message) ──
 
 dashboardRouter.get('/dashboard/chat', async (req, res) => {
-  let users = [];
+  let users = [], contacts = [];
   try { users = await listUsers() || []; } catch {}
-  res.render('chat', { users });
+  try { contacts = await getMergedContacts(); } catch {}
+  res.render('chat', { users, contacts });
 });
 
 dashboardRouter.post('/dashboard/chat/send', async (req, res) => {
@@ -111,11 +112,11 @@ dashboardRouter.post('/dashboard/chat/send', async (req, res) => {
 // ── Broadcasts ──
 
 dashboardRouter.get('/dashboard/broadcast', async (req, res) => {
-  let broadcasts = [];
+  let broadcasts = [], users = [], contacts = [];
   try { broadcasts = await listBroadcasts() || []; } catch {}
-  let users = [];
   try { users = await listUsers() || []; } catch {}
-  res.render('broadcast', { broadcasts, users });
+  try { contacts = await getMergedContacts(); } catch {}
+  res.render('broadcast', { broadcasts, users, contacts });
 });
 
 dashboardRouter.post('/api/broadcasts', async (req, res) => {
@@ -187,9 +188,10 @@ dashboardRouter.post('/dashboard/personality', async (req, res) => {
 // ── Profile ──
 
 dashboardRouter.get('/dashboard/profile', async (req, res) => {
-  let users = [];
+  let users = [], contacts = [];
   try { users = await listUsers() || []; } catch {}
-  res.render('profile', { users });
+  try { contacts = await getMergedContacts(); } catch {}
+  res.render('profile', { users, contacts });
 });
 
 dashboardRouter.post('/dashboard/profile', async (req, res) => {
@@ -204,9 +206,10 @@ dashboardRouter.post('/dashboard/profile', async (req, res) => {
 // ── Users ──
 
 dashboardRouter.get('/dashboard/users', async (req, res) => {
-  let users = [];
+  let users = [], contacts = [];
   try { users = await listUsers() || []; } catch {}
-  res.render('users', { users });
+  try { contacts = await getMergedContacts(); } catch {}
+  res.render('users', { users, contacts });
 });
 
 dashboardRouter.get('/api/users', async (req, res) => {
@@ -244,17 +247,18 @@ dashboardRouter.post('/api/users/:jid/reset', async (req, res) => {
 // ── Memory Viewer ──
 
 dashboardRouter.get('/dashboard/memory', async (req, res) => {
-  let users = [], memory = null, jid = null, messages = [];
+  let users = [], contacts = [], memory = null, jid = null, messages = [];
   try { users = await listUsers() || []; } catch {}
+  try { contacts = await getMergedContacts(); } catch {}
   if (req.query.jid) {
     jid = req.query.jid;
     try {
       const m = await getUserMemory(jid);
-      memory = m?.context || m?.summary || '';
+      memory = m?.context || '';
       messages = await getRecentMessages(jid, 50);
     } catch {}
   }
-  res.render('memory', { users, jid, memory, messages });
+  res.render('memory', { users, contacts, jid, memory, messages });
 });
 
 // ── Tasks ──
@@ -334,6 +338,34 @@ dashboardRouter.delete('/api/prompts/:id', async (req, res) => {
 
 
 
+// ── API: Contacts (merged from Firestore + Baileys) ──
+
+async function getMergedContacts() {
+  let users = [];
+  try { users = await listUsers() || []; } catch {}
+  const userMap = {};
+  for (const u of users) userMap[u.jid] = u;
+
+  const baileysContacts = getBaileysContacts() || [];
+  for (const c of baileysContacts) {
+    if (!userMap[c.id]) {
+      userMap[c.id] = {
+        jid: c.id,
+        displayName: c.name || c.notify || null,
+        phoneNumber: c.id?.split('@')[0] || null,
+        pushName: c.notify || null,
+        isContactSaved: !!c.name,
+      };
+    }
+  }
+
+  return Object.values(userMap).sort((a, b) => {
+    const an = (a.displayName || a.phoneNumber || a.jid || '').toLowerCase();
+    const bn = (b.displayName || b.phoneNumber || b.jid || '').toLowerCase();
+    return an.localeCompare(bn);
+  });
+}
+
 // ── API: State ──
 
 dashboardRouter.get('/api/state', (req, res) => {
@@ -341,7 +373,19 @@ dashboardRouter.get('/api/state', (req, res) => {
     state: getState(),
     hasQr: !!getQR(),
     stats: getStats(),
+    repliesEnabled: getRepliesEnabled(),
   });
+});
+
+dashboardRouter.post('/api/toggle-replies', (req, res) => {
+  const enabled = req.body.enabled;
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ error: 'enabled must be boolean' });
+    return;
+  }
+  setRepliesEnabled(enabled);
+  console.log(`[TOGGLE] Replies ${enabled ? 'ENABLED' : 'DISABLED'}`);
+  res.json({ ok: true, repliesEnabled: enabled });
 });
 
 // ── API: Config ──
@@ -357,5 +401,12 @@ dashboardRouter.put('/api/config', async (req, res) => {
   try {
     await updateBotConfig(req.body);
     res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dashboardRouter.get('/api/contacts', async (req, res) => {
+  try {
+    const contacts = await getMergedContacts();
+    res.json(contacts);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

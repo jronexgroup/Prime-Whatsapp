@@ -6,14 +6,12 @@
     <input type="text" id="name" placeholder="Weekly offer" required>
     <label>Message</label>
     <textarea id="message" rows="4" placeholder="Broadcast message..." required></textarea>
-    <label>Recipients (one JID per line)</label>
-    <textarea id="recipients" rows="4" placeholder="919876543210@s.whatsapp.net"></textarea>
-    <label>Or select from users</label>
-    <select id="userSelect" multiple style="height:100px">
-      <% (users || []).forEach(u => { %>
-        <option value="<%= u.jid %>"><%= (u.profile && u.profile.name) || u.jid.split('@')[0] %></option>
-      <% }) %>
-    </select>
+    <label>Recipients</label>
+    <div class="contact-picker">
+      <input type="text" id="contactSearch" placeholder="Search contacts to add..." autocomplete="off">
+      <div id="contactDropdown" class="contact-dropdown" style="display:none"></div>
+      <div id="recipientTags" class="contact-tags"></div>
+    </div>
     <label>Scheduled (optional)</label>
     <input type="datetime-local" id="scheduledAt">
     <button type="submit">Create Broadcast</button>
@@ -43,13 +41,18 @@
 </div>
 
 <script>
+const contacts = <%- JSON.stringify(contacts || []) %>;
+const bcSelected = [];
+const picker = createContactPicker('#contactSearch', null, '#contactDropdown', contacts, {
+  multiple: true,
+  selected: bcSelected,
+  tagsContainer: '#recipientTags',
+});
+
 get('#broadcastForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const sel = Array.from(get('#userSelect').selectedOptions).map(o => o.value);
-  const manual = get('#recipients').value.split('\n').map(s => s.trim()).filter(Boolean);
-  const recipients = [...new Set([...sel, ...manual])];
-  if (!recipients.length) { showToast('Add recipients', 'error'); return; }
-  const data = { name: get('#name').value, message: get('#message').value, recipients, status: 'pending', createdAt: Date.now().toString() };
+  if (!bcSelected.length) { showToast('Add recipients', 'error'); return; }
+  const data = { name: get('#name').value, message: get('#message').value, recipients: bcSelected, status: 'pending', createdAt: Date.now().toString() };
   if (get('#scheduledAt').value) data.scheduledAt = new Date(get('#scheduledAt').value).getTime().toString();
   const r = await api('POST', '/api/broadcasts', data);
   if (r) { showToast('Created!'); location.reload(); }
