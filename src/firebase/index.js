@@ -265,10 +265,14 @@ export async function updateProfile(jid, profile) {
   });
 }
 
+function patchUrl(base, fieldPaths) {
+  const params = fieldPaths.map(fp => `updateMask.fieldPaths=${encodeURIComponent(fp)}`).join('&');
+  return `${base}?${params}`;
+}
+
 export async function createOrUpdateUser(jid, data) {
   if (!db) return;
-  const fieldPaths = Object.keys(data).join(',');
-  await api(`users/${encodeURIComponent(jid)}?updateMask.fieldPaths=${fieldPaths}`, {
+  await api(patchUrl(`users/${encodeURIComponent(jid)}`, Object.keys(data)), {
     method: 'PATCH',
     body: JSON.stringify(makeDoc(null, data)),
   });
@@ -322,7 +326,7 @@ export async function createBroadcast(data) {
 
 export async function updateBroadcast(id, data) {
   if (!db) return false;
-  const ok = await api(`broadcasts/${id}?updateMask.fieldPaths=${Object.keys(data).join(',')}`, {
+  const ok = await api(patchUrl(`broadcasts/${id}`, Object.keys(data)), {
     method: 'PATCH',
     body: JSON.stringify(makeDoc(null, data)),
   });
@@ -360,7 +364,7 @@ export async function createTask(data) {
 
 export async function updateTask(id, data) {
   if (!db) return false;
-  const ok = await api(`tasks/${id}?updateMask.fieldPaths=${Object.keys(data).join(',')}`, {
+  const ok = await api(patchUrl(`tasks/${id}`, Object.keys(data)), {
     method: 'PATCH',
     body: JSON.stringify(makeDoc(null, data)),
   });
@@ -398,8 +402,7 @@ export async function createPrompt(data) {
 
 export async function updatePrompt(id, data) {
   if (!db) return false;
-  const fieldPaths = Object.keys(data).join(',');
-  const ok = await api(`prompts/${id}?updateMask.fieldPaths=${fieldPaths}`, {
+  const ok = await api(patchUrl(`prompts/${id}`, Object.keys(data)), {
     method: 'PATCH',
     body: JSON.stringify(makeDoc(null, data)),
   });
@@ -515,8 +518,7 @@ export async function getBotConfig() {
 
 export async function updateBotConfig(config) {
   if (!db) return false;
-  const fieldPaths = Object.keys(config).join(',');
-  const ok = await api(`config/bot?updateMask.fieldPaths=${fieldPaths}`, {
+  const ok = await api(patchUrl('config/bot', Object.keys(config)), {
     method: 'PATCH',
     body: JSON.stringify(makeDoc(null, config)),
   });
